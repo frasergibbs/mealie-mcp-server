@@ -1,0 +1,406 @@
+"""Async HTTP client wrapper for Mealie API."""
+
+import os
+from typing import Any
+
+import httpx
+
+from mealie_mcp.models import (
+    Category,
+    ErrorResponse,
+    MealPlanEntry,
+    Recipe,
+    RecipeSummary,
+    ShoppingList,
+    ShoppingListItem,
+    ShoppingListSummary,
+    Tag,
+)
+
+
+class MealieClient:
+    """Async client for interacting with the Mealie API."""
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        token: str | None = None,
+        timeout: float = 30.0,
+    ):
+        """Initialize the Mealie client.
+
+        Args:
+            base_url: Mealie API base URL (e.g., http://mealie:9000/api)
+            token: Mealie API bearer token
+            timeout: Request timeout in seconds
+        """
+        self.base_url = base_url or os.getenv("MEALIE_URL", "http://localhost:9000/api")
+        self.token = token or os.getenv("MEALIE_TOKEN", "")
+        self.timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def headers(self) -> dict[str, str]:
+        """Get authorization headers."""
+        return {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """Get or create the HTTP client."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                headers=self.headers,
+                timeout=self.timeout,
+            )
+        return self._client
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | list[Any] | ErrorResponse:
+        """Make an HTTP request to the Mealie API.
+
+        Args:
+            method: HTTP method (GET, POST, PUT, DELETE)
+            endpoint: API endpoint path
+            params: Query parameters
+            json: JSON body for POST/PUT requests
+
+        Returns:
+            Parsed JSON response or ErrorResponse on failure
+        """
+        client = await self._get_client()
+
+        try:
+            response = await client.request(
+                method=method,
+                url=endpoint,
+                params=params,
+                json=json,
+            )
+
+            if response.status_code == 401:
+                return ErrorResponse.auth_error("Invalid or expired Mealie API token")
+
+            if response.status_code == 404:
+                return ErrorResponse.not_found("Resource", endpoint)
+
+            response.raise_for_status()
+
+            if response.status_code == 204:
+                return {"success": True}
+
+            return response.json()
+
+        except httpx.ConnectError:
+            return ErrorResponse.api_error(f"Cannot connect to Mealie at {self.base_url}")
+        except httpx.TimeoutException:
+            return ErrorResponse.api_error("Request to Mealie timed out")
+        except httpx.HTTPStatusError as e:
+            return ErrorResponse.api_error(f"HTTP {e.response.status_code}: {e.response.text}")
+        except Exception as e:
+            return ErrorResponse.api_error(f"Unexpected error: {str(e)}")
+
+    # Recipe Methods
+    async def search_recipes(
+        self,
+        query: str | None = None,
+        tags: list[str] | None = None,
+        categories: list[str] | None = None,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> list[RecipeSummary] | ErrorResponse:
+        """Search recipes with optional filters.
+
+        Args:
+            query: Text search term
+            tags: Filter by tag slugs
+            categories: Filter by category slugs
+            page: Page number (1-indexed)
+            per_page: Results per page
+
+        Returns:
+            List of recipe summaries or error
+        """
+        params: dict[str, Any] = {
+            "page": page,
+            "perPage": per_page,
+        }
+
+        if query:
+            params["search"] = query
+        if tags:
+            params["tags"] = tags
+        if categories:
+            params["categories"] = categories
+
+        result = await self._request("GET", "/recipes", params=params)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        if isinstance(result, dict) and "items" in result:
+            return [RecipeSummary.model_validate(r) for r in result["items"]]
+
+        return [RecipeSummary.model_validate(r) for r in result]
+
+    async def get_recipe(self, slug: str) -> Recipe | ErrorResponse:
+        """Get full recipe details by slug.
+
+        Args:
+            slug: Recipe slug or ID
+
+        Returns:
+            Complete recipe or error
+        """
+        result = await self._request("GET", f"/recipes/{slug}")
+
+        if isinstance(result, ErrorResponse):
+            if result.code == "NOT_FOUND":
+                return ErrorResponse.not_found("Recipe", slug)
+            return result
+
+        return Recipe.model_validate(result)
+
+    async def list_tags(self) -> list[Tag] | ErrorResponse:
+        """Get all available tags.
+
+        Returns:
+            List of tags or error
+        """
+        result = await self._request("GET", "/organizers/tags")
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        items = result.get("items", result) if isinstance(result, dict) else result
+        return [Tag.model_validate(t) for t in items]
+
+    async def list_categories(self) -> list[Category] | ErrorResponse:
+        """Get all available categories.
+
+        Returns:
+            List of categories or error
+        """
+        result = await self._request("GET", "/organizers/categories")
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        items = result.get("items", result) if isinstance(result, dict) else result
+        return [Category.model_validate(c) for c in items]
+
+    # Meal Plan Methods
+    async def get_meal_plan(
+        self, start_date: str, end_date: str
+    ) -> list[MealPlanEntry] | ErrorResponse:
+        """Get meal plans for a date range.
+
+        Args:
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+
+        Returns:
+            List of meal plan entries or error
+        """
+        params = {
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+
+        result = await self._request("GET", "/households/mealplans", params=params)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        items = result.get("items", result) if isinstance(result, dict) else result
+        return [MealPlanEntry.model_validate(e) for e in items]
+
+    async def create_meal_plan_entry(
+        self, date: str, recipe_id: str, entry_type: str = "dinner"
+    ) -> MealPlanEntry | ErrorResponse:
+        """Create a meal plan entry.
+
+        Args:
+            date: Date for the meal (YYYY-MM-DD)
+            recipe_id: Recipe slug or ID
+            entry_type: Meal type (breakfast, lunch, dinner, side, snack)
+
+        Returns:
+            Created meal plan entry or error
+        """
+        body = {
+            "date": date,
+            "entryType": entry_type,
+            "recipeId": recipe_id,
+        }
+
+        result = await self._request("POST", "/households/mealplans", json=body)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return MealPlanEntry.model_validate(result)
+
+    async def delete_meal_plan_entry(self, entry_id: str) -> dict[str, Any] | ErrorResponse:
+        """Delete a meal plan entry.
+
+        Args:
+            entry_id: Meal plan entry ID
+
+        Returns:
+            Success status or error
+        """
+        result = await self._request("DELETE", f"/households/mealplans/{entry_id}")
+
+        if isinstance(result, ErrorResponse):
+            if result.code == "NOT_FOUND":
+                return ErrorResponse.not_found("Meal plan entry", entry_id)
+            return result
+
+        return {"success": True, "message": f"Deleted meal plan entry {entry_id}"}
+
+    # Shopping List Methods
+    async def get_shopping_lists(self) -> list[ShoppingListSummary] | ErrorResponse:
+        """Get all shopping lists.
+
+        Returns:
+            List of shopping list summaries or error
+        """
+        result = await self._request("GET", "/households/shopping/lists")
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        items = result.get("items", result) if isinstance(result, dict) else result
+        return [ShoppingListSummary.model_validate(s) for s in items]
+
+    async def get_shopping_list(self, list_id: str) -> ShoppingList | ErrorResponse:
+        """Get a specific shopping list with items.
+
+        Args:
+            list_id: Shopping list ID
+
+        Returns:
+            Shopping list with items or error
+        """
+        result = await self._request("GET", f"/households/shopping/lists/{list_id}")
+
+        if isinstance(result, ErrorResponse):
+            if result.code == "NOT_FOUND":
+                return ErrorResponse.not_found("Shopping list", list_id)
+            return result
+
+        return ShoppingList.model_validate(result)
+
+    async def add_shopping_list_item(
+        self, list_id: str, note: str, quantity: float = 1
+    ) -> ShoppingListItem | ErrorResponse:
+        """Add an item to a shopping list.
+
+        Args:
+            list_id: Shopping list ID
+            note: Item description
+            quantity: Item quantity
+
+        Returns:
+            Created item or error
+        """
+        body = {
+            "note": note,
+            "quantity": quantity,
+            "checked": False,
+        }
+
+        result = await self._request(
+            "POST", f"/households/shopping/lists/{list_id}/items", json=body
+        )
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return ShoppingListItem.model_validate(result)
+
+    async def delete_shopping_list_item(
+        self, list_id: str, item_id: str
+    ) -> dict[str, Any] | ErrorResponse:
+        """Remove an item from a shopping list.
+
+        Args:
+            list_id: Shopping list ID
+            item_id: Item ID to remove
+
+        Returns:
+            Success status or error
+        """
+        result = await self._request(
+            "DELETE", f"/households/shopping/lists/{list_id}/items/{item_id}"
+        )
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return {"success": True}
+
+    async def clear_checked_items(self, list_id: str) -> dict[str, Any] | ErrorResponse:
+        """Remove all checked items from a shopping list.
+
+        Args:
+            list_id: Shopping list ID
+
+        Returns:
+            Success status with count of removed items or error
+        """
+        # First get the list to find checked items
+        shopping_list = await self.get_shopping_list(list_id)
+
+        if isinstance(shopping_list, ErrorResponse):
+            return shopping_list
+
+        checked_items = [item for item in shopping_list.list_items if item.checked]
+
+        if not checked_items:
+            return {"success": True, "removed_count": 0, "message": "No checked items to remove"}
+
+        # Delete each checked item
+        removed_count = 0
+        for item in checked_items:
+            result = await self.delete_shopping_list_item(list_id, item.id)
+            if not isinstance(result, ErrorResponse):
+                removed_count += 1
+
+        return {
+            "success": True,
+            "removed_count": removed_count,
+            "message": f"Removed {removed_count} checked items",
+        }
+
+
+# Global client instance
+_client: MealieClient | None = None
+
+
+def get_client() -> MealieClient:
+    """Get or create the global Mealie client instance."""
+    global _client
+    if _client is None:
+        _client = MealieClient()
+    return _client

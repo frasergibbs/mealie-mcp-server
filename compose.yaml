@@ -1,0 +1,33 @@
+# Mealie MCP Server
+# Run alongside existing Mealie instance
+
+services:
+  mealie-mcp:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: mealie-mcp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MEALIE_URL=${MEALIE_URL:-http://mealie:9000/api}
+      - MEALIE_TOKEN=${MEALIE_TOKEN}
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - MCP_TRANSPORT=sse
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8080
+    env_file:
+      - .env
+    networks:
+      - mealie_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  mealie_network:
+    external: true
