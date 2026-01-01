@@ -21,7 +21,7 @@ A Model Context Protocol (MCP) server that integrates with a self-hosted [Mealie
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mealie-mcp-server.git
+git clone https://github.com/frasergibbs/mealie-mcp-server.git
 cd mealie-mcp-server
 
 # Create virtual environment
@@ -108,6 +108,40 @@ podman-compose up -d
 
 ```bash
 tailscale funnel 8080
+```
+
+### Server Deployment (Always-On Host)
+
+For running on a dedicated home server (e.g., old laptop running Linux):
+
+```bash
+# Clone and run setup script
+git clone https://github.com/frasergibbs/mealie-mcp-server.git
+cd mealie-mcp-server
+chmod +x scripts/setup-server.sh
+./scripts/setup-server.sh
+
+# Edit .env with your Mealie credentials
+nano .env
+
+# Enable and start the service
+systemctl --user enable --now mealie-mcp
+
+# Expose via Tailscale Funnel
+tailscale funnel 8080
+```
+
+#### Service Management
+
+```bash
+# Check status
+systemctl --user status mealie-mcp
+
+# View logs
+journalctl --user -u mealie-mcp -f
+
+# Restart after code changes
+git pull && systemctl --user restart mealie-mcp
 ```
 
 ## Claude Desktop Configuration

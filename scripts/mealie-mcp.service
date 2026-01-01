@@ -1,0 +1,29 @@
+# Systemd user service for Mealie MCP Server
+# 
+# This is a template - the setup-server.sh script generates 
+# a customized version with correct paths.
+#
+# Manual installation:
+#   1. Copy to ~/.config/systemd/user/mealie-mcp.service
+#   2. Update paths to match your installation
+#   3. Run: systemctl --user daemon-reload
+#   4. Run: systemctl --user enable --now mealie-mcp
+
+[Unit]
+Description=Mealie MCP Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/USER/Repos/mealie-mcp-server
+Environment="PATH=/home/USER/Repos/mealie-mcp-server/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="MCP_TRANSPORT=sse"
+Environment="MCP_HOST=0.0.0.0"
+Environment="MCP_PORT=8080"
+EnvironmentFile=/home/USER/Repos/mealie-mcp-server/.env
+ExecStart=/home/USER/Repos/mealie-mcp-server/.venv/bin/python -m mealie_mcp.server
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
