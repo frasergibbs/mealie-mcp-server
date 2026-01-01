@@ -15,13 +15,33 @@ else
     exit 1
 fi
 
+# Find available Python 3.11+
+if command -v python3.12 &> /dev/null; then
+    PYTHON_CMD="python3.12"
+elif command -v python3.11 &> /dev/null; then
+    PYTHON_CMD="python3.11"
+elif command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    if [[ $(echo "$PYTHON_VERSION >= 3.11" | bc -l) -eq 1 ]]; then
+        PYTHON_CMD="python3"
+    else
+        echo "❌ Python 3.11+ is required. Found Python $PYTHON_VERSION"
+        exit 1
+    fi
+else
+    echo "❌ Python 3.11+ is required but not found."
+    exit 1
+fi
+
+echo "🐍 Using Python: $PYTHON_CMD ($($PYTHON_CMD --version))"
+
 # Install system dependencies
 echo "📦 Installing system dependencies..."
 if [ "$PKG_MANAGER" = "apt" ]; then
     sudo apt update
-    sudo apt install -y python3.11 python3.11-venv python3-pip git
+    sudo apt install -y python3-venv python3-pip git
 elif [ "$PKG_MANAGER" = "dnf" ]; then
-    sudo dnf install -y python3.11 python3.11-venv python3-pip git
+    sudo dnf install -y python3-venv python3-pip git
 fi
 
 # Get the directory where this script is located
@@ -34,7 +54,7 @@ echo "📂 Project directory: $PROJECT_DIR"
 
 # Create Python virtual environment
 echo "🐍 Setting up Python virtual environment..."
-python3.11 -m venv .venv
+$PYTHON_CMD -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -e .
