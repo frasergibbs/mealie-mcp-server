@@ -37,7 +37,7 @@ from mealie_mcp.tools.shopping import (
 )
 
 # Load environment variables
-load_dotenv()
+    load_dotenv()
 
 # Create the MCP server
 mcp = FastMCP(
@@ -67,16 +67,30 @@ If you must parse from the card/image, transform the data:
 - "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
 - "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
 
-### STEP 3: CREATE AND ADD PHOTO
-- Call create_recipe with the structured data
+### STEP 3: ESTIMATE NUTRITION (REQUIRED)
+ALWAYS include nutrition data when creating recipes. If not provided by the source:
+- Use your knowledge to estimate per-serving nutrition based on ingredients
+- Include at minimum: calories, protein, carbs, fat
+- Also estimate when possible: fiber, sodium, sugar, saturated fat
+
+Example estimation for a beef stir-fry (per serving):
+- calories: "520 kcal"
+- proteinContent: "35g"
+- carbohydrateContent: "45g"
+- fatContent: "22g"
+- fiberContent: "6g"
+- sodiumContent: "800mg"
+
+### STEP 4: CREATE AND ADD PHOTO
+- Call create_recipe with ALL structured data including nutrition
 - Call upload_recipe_image with the hero photo (final plated dish)
 
 ## TOOLS REFERENCE
 
 **Recipe Lookup & Creation:**
 - lookup_recipe_online: Find recipe from HelloFresh/MarleySpoon/Dinnerly online
-- create_recipe: Add new recipes with full data
-- update_recipe: Modify existing recipes
+- create_recipe: Add new recipes with full data (MUST include nutrition)
+- update_recipe: Modify existing recipes (can add missing nutrition)
 - upload_recipe_image: Add photo after creating
 - import_recipe_from_url: Import from any URL with schema.org markup
 - delete_recipe: Remove recipes

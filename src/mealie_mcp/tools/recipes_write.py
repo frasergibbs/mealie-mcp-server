@@ -78,6 +78,39 @@ async def create_recipe(
     - Ensure temperatures include units (180°C / 350°F)
     - Clarify timing where vague
 
+    ## Nutrition Data (REQUIRED)
+
+    ALWAYS include nutrition data. If not provided by source, ESTIMATE based on ingredients:
+
+    **Required fields (per serving):**
+    - calories: Total kcal (e.g., "520 kcal")
+    - proteinContent: Grams of protein (e.g., "35g")
+    - carbohydrateContent: Total carbs in grams (e.g., "45g")
+    - fatContent: Total fat in grams (e.g., "22g")
+
+    **Recommended fields:**
+    - fiberContent: Dietary fiber (e.g., "6g")
+    - sodiumContent: Sodium in mg (e.g., "800mg")
+    - sugarContent: Total sugars (e.g., "8g")
+    - saturatedFatContent: Saturated fat (e.g., "8g")
+
+    **Estimation Guidelines:**
+    - Protein: Chicken breast ~31g/100g, beef mince ~20g/100g, tofu ~8g/100g
+    - Carbs: Rice ~28g/100g cooked, pasta ~25g/100g cooked, potato ~17g/100g
+    - Fat: Olive oil ~100%, butter ~81%, cheese ~25-35%
+    - Estimate per serving based on portions in recipe_yield
+
+    Example nutrition dict:
+    {
+        "calories": "520 kcal",
+        "proteinContent": "35g",
+        "carbohydrateContent": "45g",
+        "fatContent": "22g",
+        "fiberContent": "6g",
+        "sodiumContent": "800mg",
+        "sugarContent": "5g"
+    }
+
     ## After Creation
 
     If an image is available, call upload_recipe_image with the food photo.
@@ -89,7 +122,9 @@ async def create_recipe(
         ingredients: List of ingredient objects with 'display' text.
                      Apply the transformation rules above before passing.
         instructions: List with 'text' and optional 'title' for sections
-        nutrition: Per-serving nutrition (calories, protein, carbs, fat, etc.)
+        nutrition: Per-serving nutrition dict (REQUIRED - estimate if not provided).
+                   Keys: calories, proteinContent, carbohydrateContent, fatContent,
+                   fiberContent, sodiumContent, sugarContent, saturatedFatContent
         prep_time: Preparation time (e.g., "15 minutes")
         cook_time: Cooking time (e.g., "30 minutes")
         total_time: Total time (e.g., "45 minutes")
