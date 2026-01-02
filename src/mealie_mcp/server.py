@@ -45,44 +45,35 @@ mcp = FastMCP(
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-## RECIPE IMPORT WORKFLOW (PREFERRED)
+## WHEN USER PROVIDES A RECIPE URL
 
-For any recipe URL (HelloFresh, blogs, etc.):
+ALWAYS use import_recipe_from_url FIRST. This:
+- Uses Mealie's reliable scraper to get all data
+- Downloads and saves the recipe image automatically
+- Extracts nutrition if available
 
-### STEP 1: IMPORT VIA URL
-- Call import_recipe_from_url with the URL
-- This uses Mealie's reliable scraper
+### WORKFLOW:
+1. Call import_recipe_from_url(url)
+2. If response has requires_update=true, call update_recipe to fix:
+   - Transform proprietary measurements ("1 packet" → "2 tbsp")
+   - Add missing nutrition (estimate if needed)
+3. Done! Image is already saved by the scraper.
 
-### STEP 2: FIX ANY ISSUES (if requires_update=true)
-If the response contains requires_update=true, you MUST call update_recipe to fix:
+## WHEN USER HAS NO URL (e.g., recipe card image)
 
-**Transform Proprietary Measurements:**
-- "1 packet spice blend" → "2 tbsp (15g) mixed spices"
-- "1 sachet paste" → "2 tbsp paste"
-- "1 packet cheese" → "100g grated cheese"
-- "1 bag salad" → "100g mixed salad leaves"
-
-**Add Missing Nutrition (estimate per serving):**
-- calories, proteinContent, carbohydrateContent, fatContent (required)
-- fiberContent, sodiumContent, sugarContent (recommended)
-
-### STEP 3: ADD PHOTO (optional)
-- Call upload_recipe_image with the hero photo if available
-
-## MANUAL RECIPE CREATION
-
-For recipes from images/cards without URLs, use create_recipe directly.
-You MUST transform all proprietary measurements before calling.
+Use create_recipe directly, but you MUST:
+- Transform all proprietary measurements first
+- Estimate and include nutrition data
+- Then call upload_recipe_image if photo available
 
 ## TOOLS REFERENCE
 
 **Recipe Import & Creation:**
-- import_recipe_from_url: Import from URL, then fix issues with update_recipe
-- create_recipe: Manual creation (transforms proprietary measurements first)
-- update_recipe: Fix ingredients, add nutrition to imported recipes
-- upload_recipe_image: Add photo after creating
-- import_recipe_from_url: ONLY for recipe blogs - bypasses AI transformation!
-- lookup_recipe_online: Alternative lookup for when you have recipe name but not URL
+- import_recipe_from_url: PREFERRED for URLs - scrapes data + image
+- create_recipe: For manual entry from images/cards
+- update_recipe: Fix imported recipes (ingredients, nutrition)
+- upload_recipe_image: Add photo (only needed for manual creation)
+- lookup_recipe_online: Find recipe by name when you don't have URL
 - delete_recipe: Remove recipes
 
 **Recipe Search:**
