@@ -16,7 +16,6 @@ from mealie_mcp.tools.recipes import (
     get_recipe,
     list_categories,
     list_tags,
-    lookup_recipe_online,
     search_recipes,
 )
 from mealie_mcp.tools.recipes_write import (
@@ -73,7 +72,6 @@ Use create_recipe directly, but you MUST:
 - create_recipe: For manual entry from images/cards
 - update_recipe: Fix imported recipes (ingredients, nutrition)
 - upload_recipe_image: Add photo (only needed for manual creation)
-- lookup_recipe_online: Find recipe by name when you don't have URL
 - delete_recipe: Remove recipes
 
 **Recipe Search:**
@@ -151,32 +149,6 @@ async def tool_list_categories() -> list[dict] | dict:
         List of category objects with id, slug, and name
     """
     return await list_categories()
-
-
-@mcp.tool()
-async def tool_lookup_recipe_online(
-    recipe_name: str,
-    source: str | None = None,
-    url: str | None = None,
-) -> dict:
-    """Look up a recipe online from meal-kit providers.
-
-    Use this FIRST when you recognize a recipe from a HelloFresh, Marley Spoon,
-    or other meal-kit card. The online version has:
-    - Exact ingredient quantities (not "1 packet")
-    - Complete nutritional information
-    - High-quality photos
-    - Properly formatted instructions
-
-    Args:
-        recipe_name: The recipe name (e.g., "Chipotle Beef Chilli Bowls")
-        source: Provider - "hellofresh", "marleyspoon", or "dinnerly"
-        url: Direct URL to recipe page (alternative to source)
-
-    Returns:
-        Structured recipe data ready for create_recipe, including image_url
-    """
-    return await lookup_recipe_online(recipe_name, source, url)
 
 
 # Register meal plan tools
