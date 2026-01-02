@@ -98,8 +98,12 @@ Example estimation for a beef stir-fry (per serving):
 - create_recipe: Add new recipes with full data (MUST include nutrition)
 - update_recipe: Modify existing recipes (can add missing nutrition)
 - upload_recipe_image: Add photo after creating
-- import_recipe_from_url: Import from any URL with schema.org markup
+- import_recipe_from_url: ONLY for recipe blogs - bypasses AI transformation!
 - delete_recipe: Remove recipes
+
+**For meal-kit recipes (HelloFresh, Marley Spoon, Dinnerly):**
+NEVER use import_recipe_from_url - it won't transform proprietary ingredients.
+Always use: lookup_recipe_online → transform → create_recipe
 
 **Recipe Search:**
 - search_recipes: Find by name, tags, or categories

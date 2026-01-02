@@ -421,13 +421,20 @@ async def delete_recipe(slug: str) -> dict:
 async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
     """Import a recipe from a URL using Mealie's built-in scraper.
 
-    Use this for sites with good structured data (schema.org markup).
-    For sites without good markup, use create_recipe with Claude-parsed data instead.
+    WARNING: This bypasses AI ingredient transformation! The recipe will be
+    imported exactly as scraped, including proprietary measurements like
+    "1 packet spice blend".
 
-    IMPORTANT: After importing, check if nutrition data was included.
-    If the imported recipe lacks nutrition, use update_recipe to add estimated
-    nutrition based on the ingredients. See create_recipe for nutrition estimation
-    guidelines.
+    DO NOT USE for HelloFresh, Marley Spoon, Dinnerly, or other meal-kit sites.
+    Instead use: lookup_recipe_online() → transform ingredients → create_recipe()
+
+    Use this tool ONLY for:
+    - Recipe blogs with standard measurements
+    - Sites where you want an exact copy without modification
+
+    After importing, you may still need to:
+    - Add missing nutrition via update_recipe
+    - Transform any proprietary ingredients via update_recipe
 
     Args:
         url: Recipe URL to import
