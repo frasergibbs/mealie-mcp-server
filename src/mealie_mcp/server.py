@@ -12,6 +12,7 @@ from mealie_mcp.tools.mealplans import (
     delete_meal_plan_entry,
     get_meal_plan,
 )
+from mealie_mcp.tools.planning_rules import get_meal_planning_rules
 from mealie_mcp.tools.recipes import (
     get_recipe,
     list_categories,
@@ -37,7 +38,7 @@ from mealie_mcp.tools.shopping import (
 )
 
 # Load environment variables
-    load_dotenv()
+load_dotenv()
 
 # Create the MCP server
 mcp = FastMCP(
@@ -109,6 +110,7 @@ Example estimation for a beef stir-fry (per serving):
 - get_meal_plan: View planned meals
 - create_meal_plan_entry: Add to meal plan
 - delete_meal_plan_entry: Remove from plan
+- get_meal_planning_rules: Get configured rules and macro requirements (ALWAYS call this before generating a meal plan)
 
 **Shopping:**
 - get_shopping_list, get_shopping_lists: View items
@@ -243,6 +245,21 @@ async def tool_delete_meal_plan_entry(entry_id: str) -> dict:
         Success status with confirmation message
     """
     return await delete_meal_plan_entry(entry_id)
+
+
+@mcp.tool()
+async def tool_get_meal_planning_rules() -> dict:
+    """Get the configured meal planning rules and daily macro requirements.
+
+    IMPORTANT: Always call this BEFORE generating a meal plan to get the current
+    constraints that must be followed.
+
+    Returns:
+        Dictionary with:
+        - rules: Markdown text with meal planning rules (breakfast, lunch, dinner constraints)
+        - macros: Per-day macronutrient targets (calories, protein, carbs, fat for each day)
+    """
+    return await get_meal_planning_rules()
 
 
 # Register shopping list tools
