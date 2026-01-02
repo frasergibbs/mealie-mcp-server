@@ -1,10 +1,33 @@
 """Recipe write/modification MCP tools."""
 
+import re
 from datetime import datetime
 from typing import Any
 
 from mealie_mcp.client import get_client
 from mealie_mcp.models import ErrorResponse, TimelineEventType
+
+
+def _slugify(text: str) -> str:
+    """Convert text to a URL-friendly slug.
+
+    Args:
+        text: Text to slugify
+
+    Returns:
+        Lowercase hyphenated slug
+    """
+    # Convert to lowercase
+    slug = text.lower()
+    # Replace spaces and underscores with hyphens
+    slug = re.sub(r"[\s_]+", "-", slug)
+    # Remove non-alphanumeric characters except hyphens
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
+    # Remove consecutive hyphens
+    slug = re.sub(r"-+", "-", slug)
+    # Strip leading/trailing hyphens
+    slug = slug.strip("-")
+    return slug
 
 
 async def create_recipe(
@@ -114,11 +137,12 @@ async def create_recipe(
         update_data["recipeYield"] = recipe_yield
 
     if tags:
-        # Tags need to be created/linked by name
-        update_data["tags"] = [{"name": t} for t in tags]
+        # Tags need both name and slug
+        update_data["tags"] = [{"name": t, "slug": _slugify(t)} for t in tags]
 
     if categories:
-        update_data["recipeCategory"] = [{"name": c} for c in categories]
+        # Categories need both name and slug
+        update_data["recipeCategory"] = [{"name": c, "slug": _slugify(c)} for c in categories]
 
     if source_url:
         update_data["orgURL"] = source_url
@@ -232,10 +256,10 @@ async def update_recipe(
         update_data["recipeYield"] = recipe_yield
 
     if tags:
-        update_data["tags"] = [{"name": t} for t in tags]
+        update_data["tags"] = [{"name": t, "slug": _slugify(t)} for t in tags]
 
     if categories:
-        update_data["recipeCategory"] = [{"name": c} for c in categories]
+        update_data["recipeCategory"] = [{"name": c, "slug": _slugify(c)} for c in categories]
 
     if rating is not None:
         update_data["rating"] = rating
