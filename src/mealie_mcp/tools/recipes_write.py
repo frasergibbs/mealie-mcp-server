@@ -169,6 +169,22 @@ async def create_recipe(
     result = await client.create_recipe(name)
 
     if isinstance(result, ErrorResponse):
+        # If recipe already exists, suggest using update_recipe instead
+        if "already exists" in str(result.message).lower():
+            # Try to find the existing recipe's slug
+            search_result = await client.search_recipes(name[:50])
+            suggestions = []
+            if not isinstance(search_result, ErrorResponse) and search_result.items:
+                suggestions = [
+                    {"name": r.name, "slug": r.slug}
+                    for r in search_result.items[:3]
+                ]
+            return {
+                "error": True,
+                "code": "RECIPE_EXISTS",
+                "message": f"A recipe with name '{name}' already exists. Use update_recipe to modify it, or delete_recipe first.",
+                "suggestions": suggestions,
+            }
         return result.model_dump()
 
     slug = result
