@@ -255,6 +255,10 @@ async def update_recipe(
 ) -> dict:
     """Update an existing recipe.
 
+    IMPORTANT: Use search_recipes first to find the exact slug. Mealie may
+    truncate long recipe names when generating slugs, so don't guess the slug
+    from the recipe name.
+
     Claude can help modify recipes - scaling servings, substituting ingredients,
     adjusting cooking times, or adding missing nutrition data.
 
@@ -366,6 +370,26 @@ async def update_recipe(
     result = await client.update_recipe(slug, update_data)
 
     if isinstance(result, ErrorResponse):
+        # If not found, try searching by name to find correct slug
+        if result.code == "NOT_FOUND":
+            # Extract potential recipe name from slug
+            search_term = slug.replace("-", " ")[:50]  # First 50 chars as search
+            search_results = await client.search_recipes(search_term)
+            if (
+                not isinstance(search_results, ErrorResponse)
+                and search_results.items
+            ):
+                # Found a match, suggest the correct slug
+                suggestions = [
+                    {"name": r.name, "slug": r.slug}
+                    for r in search_results.items[:3]
+                ]
+                return {
+                    "error": True,
+                    "code": "SLUG_NOT_FOUND",
+                    "message": f"Recipe with slug '{slug}' not found. Did you mean one of these?",
+                    "suggestions": suggestions,
+                }
         return result.model_dump()
 
     return {
