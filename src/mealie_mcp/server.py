@@ -17,7 +17,6 @@ from mealie_mcp.tools.recipes import (
     get_recipe,
     list_categories,
     list_tags,
-    lookup_recipe_online,
     search_recipes,
 )
 from mealie_mcp.tools.recipes_write import (
@@ -46,54 +45,34 @@ mcp = FastMCP(
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-## RECIPE CREATION WORKFLOW
+## WHEN USER PROVIDES A RECIPE URL
 
-When adding recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.):
+ALWAYS use import_recipe_from_url FIRST. This:
+- Uses Mealie's reliable scraper to get all data
+- Downloads and saves the recipe image automatically
+- Extracts nutrition if available
 
-### STEP 1: LOOK UP ONLINE VERSION FIRST
-Before relying on OCR, use lookup_recipe_online to find the original:
-- Identify the recipe name and source from the card
-- Call lookup_recipe_online(recipe_name, source="hellofresh")
-- The online version has exact quantities, nutrition, and high-res photos
+### WORKFLOW:
+1. Call import_recipe_from_url(url)
+2. If response has requires_update=true, call update_recipe to fix:
+   - Transform proprietary measurements ("1 packet" → "2 tbsp")
+   - Add missing nutrition (estimate if needed)
+3. Done! Image is already saved by the scraper.
 
-### STEP 2: APPLY AI INTELLIGENCE (if online lookup fails)
-If you must parse from the card/image, transform the data:
+## WHEN USER HAS NO URL (e.g., recipe card image)
 
-**Convert Proprietary Measurements:**
-- "1 packet spice blend" → estimate actual amount (typically 2 tbsp / 15g)
-- "1 sachet paste" → typically 20-30g or 1-2 tbsp
-- "1 packet cheese" → estimate weight (e.g., "100g shredded cheddar")
-
-**Expand Proprietary Spice Blends:**
-- "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
-- "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
-
-### STEP 3: ESTIMATE NUTRITION (REQUIRED)
-ALWAYS include nutrition data when creating recipes. If not provided by the source:
-- Use your knowledge to estimate per-serving nutrition based on ingredients
-- Include at minimum: calories, protein, carbs, fat
-- Also estimate when possible: fiber, sodium, sugar, saturated fat
-
-Example estimation for a beef stir-fry (per serving):
-- calories: "520 kcal"
-- proteinContent: "35g"
-- carbohydrateContent: "45g"
-- fatContent: "22g"
-- fiberContent: "6g"
-- sodiumContent: "800mg"
-
-### STEP 4: CREATE AND ADD PHOTO
-- Call create_recipe with ALL structured data including nutrition
-- Call upload_recipe_image with the hero photo (final plated dish)
+Use create_recipe directly, but you MUST:
+- Transform all proprietary measurements first
+- Estimate and include nutrition data
+- Then call upload_recipe_image if photo available
 
 ## TOOLS REFERENCE
 
-**Recipe Lookup & Creation:**
-- lookup_recipe_online: Find recipe from HelloFresh/MarleySpoon/Dinnerly online
-- create_recipe: Add new recipes with full data (MUST include nutrition)
-- update_recipe: Modify existing recipes (can add missing nutrition)
-- upload_recipe_image: Add photo after creating
-- import_recipe_from_url: Import from any URL with schema.org markup
+**Recipe Import & Creation:**
+- import_recipe_from_url: PREFERRED for URLs - scrapes data + image
+- create_recipe: For manual entry from images/cards
+- update_recipe: Fix imported recipes (ingredients, nutrition)
+- upload_recipe_image: Add photo (only needed for manual creation)
 - delete_recipe: Remove recipes
 
 **Recipe Search:**
@@ -172,32 +151,6 @@ async def tool_list_categories() -> list[dict] | dict:
         List of category objects with id, slug, and name
     """
     return await list_categories()
-
-
-@mcp.tool()
-async def tool_lookup_recipe_online(
-    recipe_name: str,
-    source: str | None = None,
-    url: str | None = None,
-) -> dict:
-    """Look up a recipe online from meal-kit providers.
-
-    Use this FIRST when you recognize a recipe from a HelloFresh, Marley Spoon,
-    or other meal-kit card. The online version has:
-    - Exact ingredient quantities (not "1 packet")
-    - Complete nutritional information
-    - High-quality photos
-    - Properly formatted instructions
-
-    Args:
-        recipe_name: The recipe name (e.g., "Chipotle Beef Chilli Bowls")
-        source: Provider - "hellofresh", "marleyspoon", or "dinnerly"
-        url: Direct URL to recipe page (alternative to source)
-
-    Returns:
-        Structured recipe data ready for create_recipe, including image_url
-    """
-    return await lookup_recipe_online(recipe_name, source, url)
 
 
 # Register meal plan tools

@@ -136,12 +136,55 @@ async def create_recipe(
     Returns:
         Created recipe with slug for subsequent image upload
     """
+    # Check for untransformed proprietary measurements
+    proprietary_patterns = [
+        "packet", "sachet", "bag of", "punnet", "bunch of",
+    ]
+    if ingredients:
+        untransformed = []
+        for ing in ingredients:
+            display = ing.get("display", "").lower()
+            for pattern in proprietary_patterns:
+                if pattern in display:
+                    untransformed.append(ing.get("display", ""))
+                    break
+        if untransformed:
+            return {
+                "error": True,
+                "code": "UNTRANSFORMED_INGREDIENTS",
+                "message": "Ingredients contain proprietary measurements that must be transformed to standard units before saving.",
+                "untransformed_ingredients": untransformed[:5],  # Show first 5
+                "examples": {
+                    "1 packet spice blend": "2 tbsp (15g) mixed spices",
+                    "1 sachet garlic seasoning": "1 tsp garlic powder, 1 tsp dried herbs",
+                    "1 packet cheese": "100g grated cheese",
+                    "1 bag salad leaves": "100g mixed salad leaves",
+                },
+                "action": "Transform these ingredients to standard measurements, then call create_recipe again.",
+            }
+
     client = get_client()
 
     # First create the recipe with just the name
     result = await client.create_recipe(name)
 
     if isinstance(result, ErrorResponse):
+        # If recipe already exists, suggest using update_recipe instead
+        if "already exists" in str(result.message).lower():
+            # Try to find the existing recipe's slug
+            search_result = await client.search_recipes(name[:50])
+            suggestions = []
+            if not isinstance(search_result, ErrorResponse) and search_result.items:
+                suggestions = [
+                    {"name": r.name, "slug": r.slug}
+                    for r in search_result.items[:3]
+                ]
+            return {
+                "error": True,
+                "code": "RECIPE_EXISTS",
+                "message": f"A recipe with name '{name}' already exists. Use update_recipe to modify it, or delete_recipe first.",
+                "suggestions": suggestions,
+            }
         return result.model_dump()
 
     slug = result
@@ -255,8 +298,21 @@ async def update_recipe(
 ) -> dict:
     """Update an existing recipe.
 
+    IMPORTANT: Use search_recipes first to find the exact slug. Mealie may
+    truncate long recipe names when generating slugs, so don't guess the slug
+    from the recipe name.
+
     Claude can help modify recipes - scaling servings, substituting ingredients,
     adjusting cooking times, or adding missing nutrition data.
+
+    ## Adding Missing Nutrition
+
+    Use this to add nutrition to recipes that were imported without it.
+    Estimate per-serving values based on ingredients:
+    - calories, proteinContent, carbohydrateContent, fatContent (required)
+    - fiberContent, sodiumContent, sugarContent (recommended)
+
+    See create_recipe docstring for detailed estimation guidelines.
 
     Args:
         slug: Recipe slug or ID (required)
@@ -264,7 +320,7 @@ async def update_recipe(
         description: Updated description
         ingredients: Complete ingredient list (replaces existing)
         instructions: Complete instruction list (replaces existing)
-        nutrition: Updated nutrition info
+        nutrition: Nutrition dict - use to add missing data to imported recipes
         prep_time: New preparation time
         cook_time: New cooking time
         total_time: New total time
@@ -357,6 +413,26 @@ async def update_recipe(
     result = await client.update_recipe(slug, update_data)
 
     if isinstance(result, ErrorResponse):
+        # If not found, try searching by name to find correct slug
+        if result.code == "NOT_FOUND":
+            # Extract potential recipe name from slug
+            search_term = slug.replace("-", " ")[:50]  # First 50 chars as search
+            search_results = await client.search_recipes(search_term)
+            if (
+                not isinstance(search_results, ErrorResponse)
+                and search_results.items
+            ):
+                # Found a match, suggest the correct slug
+                suggestions = [
+                    {"name": r.name, "slug": r.slug}
+                    for r in search_results.items[:3]
+                ]
+                return {
+                    "error": True,
+                    "code": "SLUG_NOT_FOUND",
+                    "message": f"Recipe with slug '{slug}' not found. Did you mean one of these?",
+                    "suggestions": suggestions,
+                }
         return result.model_dump()
 
     return {
@@ -388,15 +464,15 @@ async def delete_recipe(slug: str) -> dict:
 async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
     """Import a recipe from a URL using Mealie's built-in scraper.
 
-    Use this for sites with good structured data (schema.org markup).
-    For sites without good markup, use create_recipe with Claude-parsed data instead.
+    After importing, the tool checks for quality issues and returns them.
+    If issues are found, you MUST call update_recipe to fix them.
 
     Args:
         url: Recipe URL to import
         include_tags: Whether to import tags from the source site
 
     Returns:
-        Created recipe details with slug
+        Recipe details with any issues that need fixing via update_recipe
     """
     client = get_client()
     result = await client.import_recipe_from_url(url, include_tags)
@@ -404,7 +480,7 @@ async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
     if isinstance(result, ErrorResponse):
         return result.model_dump()
 
-    # Get the full recipe to return details
+    # Get the full recipe to check for issues
     recipe = await client.get_recipe(result)
     if isinstance(recipe, ErrorResponse):
         return {
@@ -413,14 +489,58 @@ async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
             "message": f"Recipe imported from {url}",
         }
 
-    return {
+    # Check for quality issues
+    issues: list[str] = []
+    ingredients_to_fix: list[str] = []
+
+    # Check for proprietary measurements
+    proprietary_patterns = ["packet", "sachet", "bag of", "punnet", "bunch of"]
+    if recipe.recipe_ingredient:
+        for ing in recipe.recipe_ingredient:
+            display = (ing.display or ing.note or "").lower()
+            for pattern in proprietary_patterns:
+                if pattern in display:
+                    ingredients_to_fix.append(ing.display or ing.note or "")
+                    break
+
+    if ingredients_to_fix:
+        issues.append("proprietary_measurements")
+
+    # Check for missing nutrition
+    if not recipe.nutrition or not recipe.nutrition.calories:
+        issues.append("missing_nutrition")
+
+    # Build response
+    response: dict[str, Any] = {
         "success": True,
-        "slug": result,
+        "slug": recipe.slug,
         "name": recipe.name,
         "description": recipe.description,
         "source_url": url,
-        "message": f"Recipe '{recipe.name}' imported successfully",
     }
+
+    if issues:
+        response["requires_update"] = True
+        response["issues"] = issues
+        response["message"] = f"Recipe '{recipe.name}' imported. REQUIRED: Call update_recipe to fix issues."
+
+        if ingredients_to_fix:
+            response["ingredients_to_transform"] = ingredients_to_fix
+            response["transformation_examples"] = {
+                "1 packet spice blend": "2 tbsp (15g) mixed spices",
+                "1 sachet seasoning": "1 tsp garlic powder, 1 tsp dried herbs",
+                "1 packet cheese": "100g grated cheese",
+                "1 bag salad": "100g mixed salad leaves",
+            }
+
+        if "missing_nutrition" in issues:
+            response["nutrition_needed"] = [
+                "calories", "proteinContent", "carbohydrateContent", "fatContent"
+            ]
+    else:
+        response["message"] = f"Recipe '{recipe.name}' imported successfully - no fixes needed"
+
+    return response
 
 
 async def mark_recipe_made(
