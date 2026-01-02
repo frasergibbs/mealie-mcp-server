@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -17,6 +18,15 @@ from mealie_mcp.tools.recipes import (
     list_tags,
     search_recipes,
 )
+from mealie_mcp.tools.recipes_write import (
+    add_recipe_note,
+    create_recipe,
+    delete_recipe,
+    get_recipe_timeline,
+    import_recipe_from_url,
+    mark_recipe_made,
+    update_recipe,
+)
 from mealie_mcp.tools.shopping import (
     add_to_shopping_list,
     clear_checked_items,
@@ -31,18 +41,35 @@ load_dotenv()
 mcp = FastMCP(
     name="mealie",
     instructions="""You are connected to a personal Mealie recipe library.
-You can search recipes, view full recipe details, manage meal plans, and work with shopping lists.
+You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-When helping with meal planning:
-- Use search_recipes to find suitable recipes based on ingredients, tags, or categories
+RECIPE MANAGEMENT:
+- Use search_recipes to find recipes by name, tags, or categories
 - Use get_recipe to get full details including ingredients and instructions
-- Use create_meal_plan_entry to add recipes to the meal plan
-- Use get_meal_plan to see what's already planned
+- Use create_recipe to add new recipes with full structured data (ingredients, instructions, nutrition)
+- Use update_recipe to modify existing recipes
+- Use import_recipe_from_url to import from websites with good schema.org markup
+- Use delete_recipe to remove recipes
 
-For shopping:
+COOKING TRACKING:
+- Use mark_recipe_made when someone cooks a recipe (updates last-made timestamp)
+- Use add_recipe_note to record cooking notes, modifications, or observations
+- Use get_recipe_timeline to see a recipe's history
+
+MEAL PLANNING:
+- Use get_meal_plan to see what's planned for a date range
+- Use create_meal_plan_entry to add recipes to the meal plan
+- Use delete_meal_plan_entry to remove from meal plan
+
+SHOPPING:
 - Use get_shopping_list to see current items
 - Use add_to_shopping_list to add ingredients or items
-- Use clear_checked_items to clean up purchased items""",
+- Use clear_checked_items to clean up purchased items
+
+When parsing recipes from text, images, or URLs for create_recipe, structure the data carefully:
+- Extract quantities, units, and food names from ingredient text
+- Number instructions sequentially
+- Estimate nutrition per serving when not provided (calories, protein, carbs, fat)""",
 )
 
 
@@ -200,6 +227,203 @@ async def tool_clear_checked_items(list_id: str | None = None) -> dict:
         Summary of removed items count
     """
     return await clear_checked_items(list_id)
+
+
+# Register recipe write tools
+@mcp.tool()
+async def tool_create_recipe(
+    name: str,
+    description: str | None = None,
+    ingredients: list[dict[str, Any]] | None = None,
+    instructions: list[dict[str, Any]] | None = None,
+    nutrition: dict[str, str] | None = None,
+    prep_time: str | None = None,
+    cook_time: str | None = None,
+    total_time: str | None = None,
+    recipe_yield: str | None = None,
+    tags: list[str] | None = None,
+    categories: list[str] | None = None,
+    source_url: str | None = None,
+) -> dict:
+    """Create a new recipe with full structured data.
+
+    Claude can parse recipes from any source (text, images, URLs, verbal descriptions)
+    and provide structured data for this tool.
+
+    Args:
+        name: Recipe name (required)
+        description: Brief description of the dish
+        ingredients: List of ingredient objects with display, quantity, unit, food, note
+        instructions: List of instruction objects with text and optional title
+        nutrition: Nutrition per serving (calories, proteinContent, carbohydrateContent, etc.)
+        prep_time: Preparation time (e.g., "15 minutes")
+        cook_time: Cooking time (e.g., "30 minutes")
+        total_time: Total time (e.g., "45 minutes")
+        recipe_yield: Serving size (e.g., "4 servings")
+        tags: List of tag names to apply
+        categories: List of category names to apply
+        source_url: Original recipe URL if imported from web
+
+    Returns:
+        Created recipe details with slug for future reference
+    """
+    return await create_recipe(
+        name=name,
+        description=description,
+        ingredients=ingredients,
+        instructions=instructions,
+        nutrition=nutrition,
+        prep_time=prep_time,
+        cook_time=cook_time,
+        total_time=total_time,
+        recipe_yield=recipe_yield,
+        tags=tags,
+        categories=categories,
+        source_url=source_url,
+    )
+
+
+@mcp.tool()
+async def tool_update_recipe(
+    slug: str,
+    name: str | None = None,
+    description: str | None = None,
+    ingredients: list[dict[str, Any]] | None = None,
+    instructions: list[dict[str, Any]] | None = None,
+    nutrition: dict[str, str] | None = None,
+    prep_time: str | None = None,
+    cook_time: str | None = None,
+    total_time: str | None = None,
+    recipe_yield: str | None = None,
+    tags: list[str] | None = None,
+    categories: list[str] | None = None,
+    rating: int | None = None,
+) -> dict:
+    """Update an existing recipe.
+
+    Args:
+        slug: Recipe slug or ID (required)
+        name: New recipe name
+        description: Updated description
+        ingredients: Complete ingredient list (replaces existing)
+        instructions: Complete instruction list (replaces existing)
+        nutrition: Updated nutrition info
+        prep_time: New preparation time
+        cook_time: New cooking time
+        total_time: New total time
+        recipe_yield: New serving size
+        tags: New tag list (replaces existing)
+        categories: New category list (replaces existing)
+        rating: Recipe rating (1-5)
+
+    Returns:
+        Updated recipe details
+    """
+    return await update_recipe(
+        slug=slug,
+        name=name,
+        description=description,
+        ingredients=ingredients,
+        instructions=instructions,
+        nutrition=nutrition,
+        prep_time=prep_time,
+        cook_time=cook_time,
+        total_time=total_time,
+        recipe_yield=recipe_yield,
+        tags=tags,
+        categories=categories,
+        rating=rating,
+    )
+
+
+@mcp.tool()
+async def tool_delete_recipe(slug: str) -> dict:
+    """Delete a recipe from the database.
+
+    Args:
+        slug: Recipe slug or ID
+
+    Returns:
+        Deletion status
+    """
+    return await delete_recipe(slug)
+
+
+@mcp.tool()
+async def tool_import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
+    """Import a recipe from a URL using Mealie's built-in scraper.
+
+    Use this for sites with good structured data. For sites without good markup,
+    have Claude parse the page and use create_recipe instead.
+
+    Args:
+        url: Recipe URL to import
+        include_tags: Whether to import tags from the source site
+
+    Returns:
+        Created recipe details with slug
+    """
+    return await import_recipe_from_url(url, include_tags)
+
+
+@mcp.tool()
+async def tool_mark_recipe_made(
+    slug: str,
+    timestamp: str | None = None,
+    notes: str | None = None,
+) -> dict:
+    """Mark a recipe as made, updating its last-made timestamp.
+
+    This tracks cooking history and can optionally add notes about the session.
+
+    Args:
+        slug: Recipe slug or ID
+        timestamp: When made (ISO format, defaults to now)
+        notes: Optional cooking notes (modifications, results, etc.)
+
+    Returns:
+        Confirmation with updated timestamp
+    """
+    return await mark_recipe_made(slug, timestamp, notes)
+
+
+@mcp.tool()
+async def tool_add_recipe_note(
+    slug: str,
+    subject: str,
+    message: str | None = None,
+    event_type: str = "comment",
+) -> dict:
+    """Add a note or comment to a recipe's timeline.
+
+    Use to record cooking notes, modifications, substitutions, or observations.
+
+    Args:
+        slug: Recipe slug or ID
+        subject: Note title/subject
+        message: Detailed note content
+        event_type: Type - "comment" (default), "info", or "system"
+
+    Returns:
+        Created timeline event details
+    """
+    return await add_recipe_note(slug, subject, message, event_type)
+
+
+@mcp.tool()
+async def tool_get_recipe_timeline(slug: str, limit: int = 20) -> list[dict] | dict:
+    """Get the timeline/history of a recipe.
+
+    Shows when made, notes, modifications, and other events.
+
+    Args:
+        slug: Recipe slug or ID
+        limit: Maximum number of events to return
+
+    Returns:
+        List of timeline events
+    """
+    return await get_recipe_timeline(slug, limit)
 
 
 def main():

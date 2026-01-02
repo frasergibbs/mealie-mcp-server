@@ -1,6 +1,6 @@
 """Pydantic models for Mealie API responses and MCP tool parameters."""
 
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 from typing import Any
 
@@ -16,6 +16,14 @@ class MealType(str, Enum):
     DINNER = "dinner"
     SIDE = "side"
     SNACK = "snack"
+
+
+class TimelineEventType(str, Enum):
+    """Types of timeline events."""
+
+    SYSTEM = "system"
+    INFO = "info"
+    COMMENT = "comment"
 
 
 # Base Models
@@ -72,6 +80,10 @@ class RecipeNutrition(MealieBase):
     fiber_content: str | None = Field(None, alias="fiberContent")
     sodium_content: str | None = Field(None, alias="sodiumContent")
     sugar_content: str | None = Field(None, alias="sugarContent")
+    cholesterol_content: str | None = Field(None, alias="cholesterolContent")
+    saturated_fat_content: str | None = Field(None, alias="saturatedFatContent")
+    trans_fat_content: str | None = Field(None, alias="transFatContent")
+    unsaturated_fat_content: str | None = Field(None, alias="unsaturatedFatContent")
 
 
 class RecipeSummary(MealieBase):
@@ -196,3 +208,97 @@ class ErrorResponse(BaseModel):
     @classmethod
     def validation_error(cls, message: str) -> "ErrorResponse":
         return cls(code="VALIDATION_ERROR", message=message)
+
+
+# Recipe Creation Models
+class RecipeIngredientCreate(BaseModel):
+    """Model for creating a recipe ingredient."""
+
+    quantity: float | None = None
+    unit: str | None = None
+    food: str | None = None
+    note: str | None = None
+    original_text: str | None = Field(None, alias="originalText")
+    display: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RecipeInstructionCreate(BaseModel):
+    """Model for creating a recipe instruction step."""
+
+    title: str | None = None
+    text: str
+    summary: str | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RecipeNutritionCreate(BaseModel):
+    """Model for creating recipe nutrition info."""
+
+    calories: str | None = None
+    protein_content: str | None = Field(None, alias="proteinContent")
+    carbohydrate_content: str | None = Field(None, alias="carbohydrateContent")
+    fat_content: str | None = Field(None, alias="fatContent")
+    fiber_content: str | None = Field(None, alias="fiberContent")
+    sodium_content: str | None = Field(None, alias="sodiumContent")
+    sugar_content: str | None = Field(None, alias="sugarContent")
+    cholesterol_content: str | None = Field(None, alias="cholesterolContent")
+    saturated_fat_content: str | None = Field(None, alias="saturatedFatContent")
+    trans_fat_content: str | None = Field(None, alias="transFatContent")
+    unsaturated_fat_content: str | None = Field(None, alias="unsaturatedFatContent")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class RecipeCreate(BaseModel):
+    """Model for creating a full recipe."""
+
+    name: str
+    description: str | None = None
+    recipe_yield: str | None = Field(None, alias="recipeYield")
+    recipe_yield_quantity: float | None = Field(None, alias="recipeYieldQuantity")
+    total_time: str | None = Field(None, alias="totalTime")
+    prep_time: str | None = Field(None, alias="prepTime")
+    cook_time: str | None = Field(None, alias="cookTime")
+    perform_time: str | None = Field(None, alias="performTime")
+    recipe_ingredient: list[RecipeIngredientCreate] = Field(
+        default_factory=list, alias="recipeIngredient"
+    )
+    recipe_instructions: list[RecipeInstructionCreate] = Field(
+        default_factory=list, alias="recipeInstructions"
+    )
+    nutrition: RecipeNutritionCreate | None = None
+    tags: list[str] = Field(default_factory=list)
+    recipe_category: list[str] = Field(default_factory=list, alias="recipeCategory")
+    notes: list[dict[str, Any]] = Field(default_factory=list)
+    org_url: str | None = Field(None, alias="orgURL")
+    rating: int | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+# Timeline Event Models
+class TimelineEventCreate(BaseModel):
+    """Model for creating a timeline event."""
+
+    recipe_id: str = Field(alias="recipeId")
+    subject: str
+    event_type: TimelineEventType = Field(alias="eventType")
+    event_message: str | None = Field(None, alias="eventMessage")
+    timestamp: datetime | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class TimelineEvent(MealieBase):
+    """Timeline event response model."""
+
+    id: str
+    recipe_id: str = Field(alias="recipeId")
+    user_id: str | None = Field(None, alias="userId")
+    subject: str
+    event_type: TimelineEventType = Field(alias="eventType")
+    event_message: str | None = Field(None, alias="eventMessage")
+    timestamp: datetime

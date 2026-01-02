@@ -1,6 +1,7 @@
 """Async HTTP client wrapper for Mealie API."""
 
 import os
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -10,11 +11,15 @@ from mealie_mcp.models import (
     ErrorResponse,
     MealPlanEntry,
     Recipe,
+    RecipeCreate,
     RecipeSummary,
     ShoppingList,
     ShoppingListItem,
     ShoppingListSummary,
     Tag,
+    TimelineEvent,
+    TimelineEventCreate,
+    TimelineEventType,
 )
 
 
@@ -392,6 +397,181 @@ class MealieClient:
             "removed_count": removed_count,
             "message": f"Removed {removed_count} checked items",
         }
+
+    # Recipe Write Methods
+    async def create_recipe(self, name: str) -> str | ErrorResponse:
+        """Create a new recipe with just a name.
+
+        Args:
+            name: Recipe name
+
+        Returns:
+            Recipe slug or error
+        """
+        result = await self._request("POST", "/recipes", json={"name": name})
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # API returns the slug as a string
+        if isinstance(result, str):
+            return result
+
+        return ErrorResponse.api_error("Unexpected response format from create recipe")
+
+    async def update_recipe(self, slug: str, data: dict[str, Any]) -> Recipe | ErrorResponse:
+        """Update an existing recipe.
+
+        Args:
+            slug: Recipe slug
+            data: Recipe data to update
+
+        Returns:
+            Updated recipe or error
+        """
+        result = await self._request("PATCH", f"/recipes/{slug}", json=data)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return Recipe.model_validate(result)
+
+    async def delete_recipe(self, slug: str) -> dict[str, Any] | ErrorResponse:
+        """Delete a recipe.
+
+        Args:
+            slug: Recipe slug
+
+        Returns:
+            Success status or error
+        """
+        result = await self._request("DELETE", f"/recipes/{slug}")
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return {"success": True, "message": f"Recipe '{slug}' deleted"}
+
+    async def import_recipe_from_url(
+        self, url: str, include_tags: bool = False
+    ) -> str | ErrorResponse:
+        """Import a recipe from a URL.
+
+        Args:
+            url: Recipe URL to scrape
+            include_tags: Whether to include tags from the source
+
+        Returns:
+            Recipe slug or error
+        """
+        result = await self._request(
+            "POST",
+            "/recipes/create/url",
+            json={"url": url, "includeTags": include_tags},
+        )
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # API returns the slug as a string
+        if isinstance(result, str):
+            return result
+
+        return ErrorResponse.api_error("Unexpected response format from URL import")
+
+    async def update_recipe_last_made(
+        self, slug: str, timestamp: datetime | None = None
+    ) -> dict[str, Any] | ErrorResponse:
+        """Update a recipe's last made timestamp.
+
+        Args:
+            slug: Recipe slug
+            timestamp: When the recipe was made (defaults to now)
+
+        Returns:
+            Success status or error
+        """
+        if timestamp is None:
+            timestamp = datetime.now()
+
+        result = await self._request(
+            "PATCH",
+            f"/recipes/{slug}/last-made",
+            json={"timestamp": timestamp.isoformat()},
+        )
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return {"success": True, "message": f"Marked '{slug}' as made at {timestamp.isoformat()}"}
+
+    # Timeline Methods
+    async def create_timeline_event(
+        self,
+        recipe_id: str,
+        subject: str,
+        event_type: TimelineEventType = TimelineEventType.COMMENT,
+        event_message: str | None = None,
+        timestamp: datetime | None = None,
+    ) -> TimelineEvent | ErrorResponse:
+        """Create a timeline event for a recipe.
+
+        Args:
+            recipe_id: Recipe ID (UUID)
+            subject: Event subject/title
+            event_type: Type of event (system, info, comment)
+            event_message: Optional event details
+            timestamp: Event timestamp (defaults to now)
+
+        Returns:
+            Created timeline event or error
+        """
+        body: dict[str, Any] = {
+            "recipeId": recipe_id,
+            "subject": subject,
+            "eventType": event_type.value,
+        }
+
+        if event_message:
+            body["eventMessage"] = event_message
+
+        if timestamp:
+            body["timestamp"] = timestamp.isoformat()
+
+        result = await self._request("POST", "/recipes/timeline/events", json=body)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        return TimelineEvent.model_validate(result)
+
+    async def get_recipe_timeline(
+        self, recipe_id: str, page: int = 1, per_page: int = 20
+    ) -> list[TimelineEvent] | ErrorResponse:
+        """Get timeline events for a recipe.
+
+        Args:
+            recipe_id: Recipe ID (UUID)
+            page: Page number
+            per_page: Results per page
+
+        Returns:
+            List of timeline events or error
+        """
+        params = {
+            "page": page,
+            "perPage": per_page,
+            "queryFilter": f'recipeId = "{recipe_id}"',
+        }
+
+        result = await self._request("GET", "/recipes/timeline/events", params=params)
+
+        if isinstance(result, ErrorResponse):
+            return result
+
+        # Handle paginated response
+        items = result.get("items", result) if isinstance(result, dict) else result
+        return [TimelineEvent.model_validate(e) for e in items]
 
 
 # Global client instance
