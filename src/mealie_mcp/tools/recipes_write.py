@@ -1,6 +1,7 @@
 """Recipe write/modification MCP tools."""
 
 import re
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -97,6 +98,7 @@ async def create_recipe(
         formatted_ingredients = []
         for ing in ingredients:
             ingredient = {
+                "referenceId": str(uuid.uuid4()),  # Required by Mealie
                 "display": ing.get("display", ""),
                 "originalText": ing.get("display", ing.get("originalText", "")),
             }
@@ -217,6 +219,7 @@ async def update_recipe(
         formatted_ingredients = []
         for ing in ingredients:
             ingredient = {
+                "referenceId": str(uuid.uuid4()),  # Required by Mealie
                 "display": ing.get("display", ""),
                 "originalText": ing.get("display", ing.get("originalText", "")),
             }
