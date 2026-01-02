@@ -37,7 +37,7 @@ from mealie_mcp.tools.shopping import (
 )
 
 # Load environment variables
-    load_dotenv()
+load_dotenv()
 
 # Create the MCP server
 mcp = FastMCP(
