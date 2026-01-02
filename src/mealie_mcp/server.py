@@ -53,19 +53,25 @@ When adding recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.):
 Before relying on OCR, use lookup_recipe_online to find the original:
 - Identify the recipe name and source from the card
 - Call lookup_recipe_online(recipe_name, source="hellofresh")
-- The online version has exact quantities, nutrition, and high-res photos
+- The online version has nutrition data and high-res photos
 
-### STEP 2: APPLY AI INTELLIGENCE (if online lookup fails)
-If you must parse from the card/image, transform the data:
+### STEP 2: ALWAYS APPLY AI INTELLIGENCE TO INGREDIENTS
+Even when online lookup succeeds, ALWAYS transform ingredients before saving:
 
 **Convert Proprietary Measurements:**
 - "1 packet spice blend" → estimate actual amount (typically 2 tbsp / 15g)
 - "1 sachet paste" → typically 20-30g or 1-2 tbsp
 - "1 packet cheese" → estimate weight (e.g., "100g shredded cheddar")
+- "1 tin" → specify size (e.g., "400g tin crushed tomatoes")
 
 **Expand Proprietary Spice Blends:**
 - "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
 - "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
+- Research the specific brand if known for accurate component spices
+
+**Standardize Vague Quantities:**
+- "olive oil for cooking" → "2 tbsp olive oil"
+- "a knob of butter" → "1 tbsp butter"
 
 ### STEP 3: ESTIMATE NUTRITION (REQUIRED)
 ALWAYS include nutrition data when creating recipes. If not provided by the source:

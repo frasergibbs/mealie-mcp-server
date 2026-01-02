@@ -266,13 +266,11 @@ async def lookup_recipe_online(
     """Look up a recipe online from known sources like HelloFresh.
 
     Use this when you recognize a recipe from a meal kit card to find the
-    complete online version with accurate ingredients, instructions, and nutrition.
+    complete online version with nutrition data and photos.
 
-    The online version typically has:
-    - Exact ingredient quantities (not "1 packet")
-    - Complete nutritional information
-    - High-quality photos
-    - Properly formatted instructions
+    IMPORTANT: The returned ingredients may still contain proprietary
+    measurements like "1 packet spice blend". You MUST transform these
+    to standard measurements before calling create_recipe.
 
     Args:
         recipe_name: The recipe name (e.g., "Chipotle Beef Chilli Bowls")
@@ -280,7 +278,7 @@ async def lookup_recipe_online(
         url: Direct URL to the recipe page (if known)
 
     Returns:
-        Structured recipe data ready for create_recipe, or error if not found
+        Structured recipe data - transform ingredients before passing to create_recipe
     """
     try:
         # If direct URL provided, use it
