@@ -45,65 +45,45 @@ mcp = FastMCP(
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-## RECIPE CREATION WORKFLOW
+## RECIPE IMPORT WORKFLOW (PREFERRED)
 
-When adding recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.):
+For any recipe URL (HelloFresh, blogs, etc.):
 
-### STEP 1: LOOK UP ONLINE VERSION FIRST
-Before relying on OCR, use lookup_recipe_online to find the original:
-- Identify the recipe name and source from the card
-- Call lookup_recipe_online(recipe_name, source="hellofresh")
-- The online version has nutrition data and high-res photos
+### STEP 1: IMPORT VIA URL
+- Call import_recipe_from_url with the URL
+- This uses Mealie's reliable scraper
 
-### STEP 2: ALWAYS APPLY AI INTELLIGENCE TO INGREDIENTS
-Even when online lookup succeeds, ALWAYS transform ingredients before saving:
+### STEP 2: FIX ANY ISSUES (if requires_update=true)
+If the response contains requires_update=true, you MUST call update_recipe to fix:
 
-**Convert Proprietary Measurements:**
-- "1 packet spice blend" → estimate actual amount (typically 2 tbsp / 15g)
-- "1 sachet paste" → typically 20-30g or 1-2 tbsp
-- "1 packet cheese" → estimate weight (e.g., "100g shredded cheddar")
-- "1 tin" → specify size (e.g., "400g tin crushed tomatoes")
+**Transform Proprietary Measurements:**
+- "1 packet spice blend" → "2 tbsp (15g) mixed spices"
+- "1 sachet paste" → "2 tbsp paste"
+- "1 packet cheese" → "100g grated cheese"
+- "1 bag salad" → "100g mixed salad leaves"
 
-**Expand Proprietary Spice Blends:**
-- "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
-- "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
-- Research the specific brand if known for accurate component spices
+**Add Missing Nutrition (estimate per serving):**
+- calories, proteinContent, carbohydrateContent, fatContent (required)
+- fiberContent, sodiumContent, sugarContent (recommended)
 
-**Standardize Vague Quantities:**
-- "olive oil for cooking" → "2 tbsp olive oil"
-- "a knob of butter" → "1 tbsp butter"
+### STEP 3: ADD PHOTO (optional)
+- Call upload_recipe_image with the hero photo if available
 
-### STEP 3: ESTIMATE NUTRITION (REQUIRED)
-ALWAYS include nutrition data when creating recipes. If not provided by the source:
-- Use your knowledge to estimate per-serving nutrition based on ingredients
-- Include at minimum: calories, protein, carbs, fat
-- Also estimate when possible: fiber, sodium, sugar, saturated fat
+## MANUAL RECIPE CREATION
 
-Example estimation for a beef stir-fry (per serving):
-- calories: "520 kcal"
-- proteinContent: "35g"
-- carbohydrateContent: "45g"
-- fatContent: "22g"
-- fiberContent: "6g"
-- sodiumContent: "800mg"
-
-### STEP 4: CREATE AND ADD PHOTO
-- Call create_recipe with ALL structured data including nutrition
-- Call upload_recipe_image with the hero photo (final plated dish)
+For recipes from images/cards without URLs, use create_recipe directly.
+You MUST transform all proprietary measurements before calling.
 
 ## TOOLS REFERENCE
 
-**Recipe Lookup & Creation:**
-- lookup_recipe_online: Find recipe from HelloFresh/MarleySpoon/Dinnerly online
-- create_recipe: Add new recipes with full data (MUST include nutrition)
-- update_recipe: Modify existing recipes (can add missing nutrition)
+**Recipe Import & Creation:**
+- import_recipe_from_url: Import from URL, then fix issues with update_recipe
+- create_recipe: Manual creation (transforms proprietary measurements first)
+- update_recipe: Fix ingredients, add nutrition to imported recipes
 - upload_recipe_image: Add photo after creating
 - import_recipe_from_url: ONLY for recipe blogs - bypasses AI transformation!
+- lookup_recipe_online: Alternative lookup for when you have recipe name but not URL
 - delete_recipe: Remove recipes
-
-**For meal-kit recipes (HelloFresh, Marley Spoon, Dinnerly):**
-NEVER use import_recipe_from_url - it won't transform proprietary ingredients.
-Always use: lookup_recipe_online → transform → create_recipe
 
 **Recipe Search:**
 - search_recipes: Find by name, tags, or categories

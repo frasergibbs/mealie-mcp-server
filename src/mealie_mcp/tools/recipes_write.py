@@ -448,27 +448,15 @@ async def delete_recipe(slug: str) -> dict:
 async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
     """Import a recipe from a URL using Mealie's built-in scraper.
 
-    WARNING: This bypasses AI ingredient transformation! The recipe will be
-    imported exactly as scraped, including proprietary measurements like
-    "1 packet spice blend".
-
-    DO NOT USE for HelloFresh, Marley Spoon, Dinnerly, or other meal-kit sites.
-    Instead use: lookup_recipe_online() → transform ingredients → create_recipe()
-
-    Use this tool ONLY for:
-    - Recipe blogs with standard measurements
-    - Sites where you want an exact copy without modification
-
-    After importing, you may still need to:
-    - Add missing nutrition via update_recipe
-    - Transform any proprietary ingredients via update_recipe
+    After importing, the tool checks for quality issues and returns them.
+    If issues are found, you MUST call update_recipe to fix them.
 
     Args:
         url: Recipe URL to import
         include_tags: Whether to import tags from the source site
 
     Returns:
-        Created recipe details with slug
+        Recipe details with any issues that need fixing via update_recipe
     """
     client = get_client()
     result = await client.import_recipe_from_url(url, include_tags)
@@ -476,7 +464,7 @@ async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
     if isinstance(result, ErrorResponse):
         return result.model_dump()
 
-    # Get the full recipe to return details
+    # Get the full recipe to check for issues
     recipe = await client.get_recipe(result)
     if isinstance(recipe, ErrorResponse):
         return {
@@ -485,14 +473,58 @@ async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
             "message": f"Recipe imported from {url}",
         }
 
-    return {
+    # Check for quality issues
+    issues: list[str] = []
+    ingredients_to_fix: list[str] = []
+
+    # Check for proprietary measurements
+    proprietary_patterns = ["packet", "sachet", "bag of", "punnet", "bunch of"]
+    if recipe.recipe_ingredient:
+        for ing in recipe.recipe_ingredient:
+            display = (ing.display or ing.note or "").lower()
+            for pattern in proprietary_patterns:
+                if pattern in display:
+                    ingredients_to_fix.append(ing.display or ing.note or "")
+                    break
+
+    if ingredients_to_fix:
+        issues.append("proprietary_measurements")
+
+    # Check for missing nutrition
+    if not recipe.nutrition or not recipe.nutrition.calories:
+        issues.append("missing_nutrition")
+
+    # Build response
+    response: dict[str, Any] = {
         "success": True,
-        "slug": result,
+        "slug": recipe.slug,
         "name": recipe.name,
         "description": recipe.description,
         "source_url": url,
-        "message": f"Recipe '{recipe.name}' imported successfully",
     }
+
+    if issues:
+        response["requires_update"] = True
+        response["issues"] = issues
+        response["message"] = f"Recipe '{recipe.name}' imported. REQUIRED: Call update_recipe to fix issues."
+
+        if ingredients_to_fix:
+            response["ingredients_to_transform"] = ingredients_to_fix
+            response["transformation_examples"] = {
+                "1 packet spice blend": "2 tbsp (15g) mixed spices",
+                "1 sachet seasoning": "1 tsp garlic powder, 1 tsp dried herbs",
+                "1 packet cheese": "100g grated cheese",
+                "1 bag salad": "100g mixed salad leaves",
+            }
+
+        if "missing_nutrition" in issues:
+            response["nutrition_needed"] = [
+                "calories", "proteinContent", "carbohydrateContent", "fatContent"
+            ]
+    else:
+        response["message"] = f"Recipe '{recipe.name}' imported successfully - no fixes needed"
+
+    return response
 
 
 async def mark_recipe_made(
