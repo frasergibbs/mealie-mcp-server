@@ -17,8 +17,11 @@ services:
       - MCP_TRANSPORT=sse
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8080
+      - RULES_DATA_DIR=/data
     env_file:
       - .env
+    volumes:
+      - mealie-mcp-data:/data
     networks:
       - mealie_network
     healthcheck:
@@ -27,6 +30,33 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  mealie-mcp-portal:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: mealie-mcp-portal
+    restart: unless-stopped
+    command: ["python", "-m", "mealie_mcp.portal.app"]
+    ports:
+      - "8081:8081"
+    environment:
+      - PORTAL_HOST=0.0.0.0
+      - PORTAL_PORT=8081
+      - RULES_DATA_DIR=/data
+    volumes:
+      - mealie-mcp-data:/data
+    networks:
+      - mealie_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mealie-mcp-data:
 
 networks:
   mealie_network:

@@ -63,6 +63,7 @@ MCP_TRANSPORT=sse python -m mealie_mcp.server
 | `get_meal_plan` | Get meal plan for a date range |
 | `create_meal_plan_entry` | Add a recipe to the meal plan |
 | `delete_meal_plan_entry` | Remove an entry from the meal plan |
+| `get_meal_planning_rules` | Get configured rules and daily macro requirements |
 | `get_shopping_lists` | Get all shopping lists |
 | `get_shopping_list` | Get items from a shopping list |
 | `add_to_shopping_list` | Add items to a shopping list |
@@ -79,6 +80,9 @@ MCP_TRANSPORT=sse python -m mealie_mcp.server
 | `MCP_TRANSPORT` | Transport mode: `stdio` or `sse` | `stdio` |
 | `MCP_HOST` | Host to bind (SSE mode only) | `0.0.0.0` |
 | `MCP_PORT` | Port to bind (SSE mode only) | `8080` |
+| `RULES_DATA_DIR` | Directory for storing rules config | `/data` |
+| `PORTAL_HOST` | Host for rules portal | `0.0.0.0` |
+| `PORTAL_PORT` | Port for rules portal | `8081` |
 
 ## Deployment
 
@@ -100,9 +104,33 @@ podman run -d \
 ### Docker Compose
 
 ```bash
-# Start the service
+# Start all services (MCP server + rules portal)
 podman-compose up -d
 ```
+
+The rules portal will be available at `http://localhost:8081`.
+
+## Meal Planning Rules Portal
+
+A mobile-friendly web UI for configuring meal planning constraints that Claude follows when generating meal plans.
+
+### Accessing the Portal
+
+- **Local**: `http://localhost:8081`
+- **Via Tailscale**: `tailscale funnel 8081` then access at your funnel URL
+
+### Features
+
+- **Rules Tab**: Edit meal planning rules in markdown format (breakfast, lunch, dinner constraints)
+- **Daily Macros Tab**: Configure per-day calorie and macronutrient targets with "copy to all" shortcuts
+
+### Default Rules
+
+The portal comes with sensible defaults that you can customize:
+
+- Breakfast: Simple/basic Monday-Friday, repetition allowed
+- Lunch: Meal-prep friendly for weekdays (prepared on Sundays)
+- Dinner: No consecutive protein repetition, easy meals Mon-Tue, configurable takeout days
 
 ### Expose via Tailscale Funnel
 
@@ -213,10 +241,15 @@ mealie-mcp-server/
 │   ├── server.py          # Main MCP server entry point
 │   ├── client.py          # Mealie API client wrapper
 │   ├── models.py          # Pydantic models
+│   ├── portal/
+│   │   ├── __init__.py
+│   │   ├── app.py         # FastAPI rules portal
+│   │   └── rules.py       # Rules storage/retrieval
 │   └── tools/
 │       ├── __init__.py
 │       ├── recipes.py     # Recipe tools
 │       ├── mealplans.py   # Meal planning tools
+│       ├── planning_rules.py  # Rules MCP tool
 │       └── shopping.py    # Shopping list tools
 ├── tests/
 ├── Containerfile
