@@ -117,7 +117,11 @@ async def create_recipe(
         # Format instructions for Mealie API
         formatted_instructions = []
         for inst in instructions:
-            instruction = {"text": inst.get("text", "")}
+            instruction = {
+                "id": str(uuid.uuid4()),  # Required by Mealie
+                "text": inst.get("text", ""),
+                "ingredientReferences": [],  # Required by Mealie
+            }
             if "title" in inst and inst["title"]:
                 instruction["title"] = inst["title"]
             formatted_instructions.append(instruction)
@@ -237,7 +241,11 @@ async def update_recipe(
     if instructions:
         formatted_instructions = []
         for inst in instructions:
-            instruction = {"text": inst.get("text", "")}
+            instruction = {
+                "id": str(uuid.uuid4()),  # Required by Mealie
+                "text": inst.get("text", ""),
+                "ingredientReferences": [],  # Required by Mealie
+            }
             if "title" in inst and inst["title"]:
                 instruction["title"] = inst["title"]
             formatted_instructions.append(instruction)
