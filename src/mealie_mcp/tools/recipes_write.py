@@ -95,12 +95,14 @@ async def create_recipe(
 
     if ingredients:
         # Format ingredients for Mealie API
+        # Mealie uses 'note' field to display ingredient text in the UI
         formatted_ingredients = []
         for ing in ingredients:
+            display_text = ing.get("display", "")
             ingredient = {
                 "referenceId": str(uuid.uuid4()),  # Required by Mealie
-                "display": ing.get("display", ""),
-                "originalText": ing.get("display", ing.get("originalText", "")),
+                "display": display_text,
+                "note": ing.get("note", display_text),  # UI displays from 'note'
             }
             if "quantity" in ing and ing["quantity"] is not None:
                 ingredient["quantity"] = float(ing["quantity"])
@@ -108,8 +110,6 @@ async def create_recipe(
                 ingredient["unit"] = {"name": ing["unit"]}
             if "food" in ing and ing["food"]:
                 ingredient["food"] = {"name": ing["food"]}
-            if "note" in ing and ing["note"]:
-                ingredient["note"] = ing["note"]
             formatted_ingredients.append(ingredient)
         update_data["recipeIngredient"] = formatted_ingredients
 
@@ -220,12 +220,15 @@ async def update_recipe(
         update_data["description"] = description
 
     if ingredients:
+        # Format ingredients for Mealie API
+        # Mealie uses 'note' field to display ingredient text in the UI
         formatted_ingredients = []
         for ing in ingredients:
+            display_text = ing.get("display", "")
             ingredient = {
                 "referenceId": str(uuid.uuid4()),  # Required by Mealie
-                "display": ing.get("display", ""),
-                "originalText": ing.get("display", ing.get("originalText", "")),
+                "display": display_text,
+                "note": ing.get("note", display_text),  # UI displays from 'note'
             }
             if "quantity" in ing and ing["quantity"] is not None:
                 ingredient["quantity"] = float(ing["quantity"])
@@ -233,8 +236,6 @@ async def update_recipe(
                 ingredient["unit"] = {"name": ing["unit"]}
             if "food" in ing and ing["food"]:
                 ingredient["food"] = {"name": ing["food"]}
-            if "note" in ing and ing["note"]:
-                ingredient["note"] = ing["note"]
             formatted_ingredients.append(ingredient)
         update_data["recipeIngredient"] = formatted_ingredients
 
