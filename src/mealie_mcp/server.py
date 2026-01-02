@@ -16,6 +16,7 @@ from mealie_mcp.tools.recipes import (
     get_recipe,
     list_categories,
     list_tags,
+    lookup_recipe_online,
     search_recipes,
 )
 from mealie_mcp.tools.recipes_write import (
@@ -44,53 +45,61 @@ mcp = FastMCP(
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-## RECIPE CREATION - AI INTELLIGENCE REQUIRED
+## RECIPE CREATION WORKFLOW
 
-When creating recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.) or other sources:
+When adding recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.):
 
-### 1. CONVERT PROPRIETARY MEASUREMENTS
-Transform meal-kit packaging to standard cooking units:
+### STEP 1: LOOK UP ONLINE VERSION FIRST
+Before relying on OCR, use lookup_recipe_online to find the original:
+- Identify the recipe name and source from the card
+- Call lookup_recipe_online(recipe_name, source="hellofresh")
+- The online version has exact quantities, nutrition, and high-res photos
+
+### STEP 2: APPLY AI INTELLIGENCE (if online lookup fails)
+If you must parse from the card/image, transform the data:
+
+**Convert Proprietary Measurements:**
 - "1 packet spice blend" → estimate actual amount (typically 2 tbsp / 15g)
 - "1 sachet paste" → typically 20-30g or 1-2 tbsp
 - "1 packet cheese" → estimate weight (e.g., "100g shredded cheddar")
-- "1 tin tomatoes" → specify size (e.g., "400g tin crushed tomatoes")
 
-### 2. EXPAND PROPRIETARY SPICE BLENDS
-Replace branded blends with component spices:
+**Expand Proprietary Spice Blends:**
 - "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
 - "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
-- "Tuscan seasoning" → "1 tsp rosemary, 1 tsp thyme, ½ tsp oregano, ½ tsp garlic powder"
-- "Mexican spice blend" → "1 tsp cumin, 1 tsp paprika, ½ tsp oregano, ½ tsp chili powder"
 
-### 3. UPLOAD PHOTOS
-After creating a recipe, use upload_recipe_image with:
-- The FINAL PLATED DISH photo (not raw ingredients)
-- Crop/focus on the food presentation
-- Base64 encode the image data
+### STEP 3: CREATE AND ADD PHOTO
+- Call create_recipe with the structured data
+- Call upload_recipe_image with the hero photo (final plated dish)
 
-## RECIPE MANAGEMENT
-- search_recipes: Find by name, tags, or categories
-- get_recipe: Get full details with ingredients/instructions
-- create_recipe: Add new recipes (apply AI transformations above)
+## TOOLS REFERENCE
+
+**Recipe Lookup & Creation:**
+- lookup_recipe_online: Find recipe from HelloFresh/MarleySpoon/Dinnerly online
+- create_recipe: Add new recipes with full data
 - update_recipe: Modify existing recipes
-- upload_recipe_image: Add photo after creating recipe
-- import_recipe_from_url: Import from sites with schema.org markup
+- upload_recipe_image: Add photo after creating
+- import_recipe_from_url: Import from any URL with schema.org markup
 - delete_recipe: Remove recipes
 
-## COOKING TRACKING
-- mark_recipe_made: Record when a recipe is cooked
-- add_recipe_note: Add cooking notes, modifications, observations
-- get_recipe_timeline: View recipe history
+**Recipe Search:**
+- search_recipes: Find by name, tags, or categories
+- get_recipe: Get full details with ingredients/instructions
+- list_tags, list_categories: Get available filters
 
-## MEAL PLANNING
-- get_meal_plan: View planned meals for date range
-- create_meal_plan_entry: Add recipe to meal plan
-- delete_meal_plan_entry: Remove from meal plan
+**Cooking Tracking:**
+- mark_recipe_made: Record when cooked
+- add_recipe_note: Add cooking notes
+- get_recipe_timeline: View history
 
-## SHOPPING
-- get_shopping_list: View current items
+**Meal Planning:**
+- get_meal_plan: View planned meals
+- create_meal_plan_entry: Add to meal plan
+- delete_meal_plan_entry: Remove from plan
+
+**Shopping:**
+- get_shopping_list, get_shopping_lists: View items
 - add_to_shopping_list: Add ingredients
-- clear_checked_items: Remove purchased items""",
+- clear_checked_items: Remove purchased""",
 )
 
 
@@ -147,6 +156,32 @@ async def tool_list_categories() -> list[dict] | dict:
         List of category objects with id, slug, and name
     """
     return await list_categories()
+
+
+@mcp.tool()
+async def tool_lookup_recipe_online(
+    recipe_name: str,
+    source: str | None = None,
+    url: str | None = None,
+) -> dict:
+    """Look up a recipe online from meal-kit providers.
+
+    Use this FIRST when you recognize a recipe from a HelloFresh, Marley Spoon,
+    or other meal-kit card. The online version has:
+    - Exact ingredient quantities (not "1 packet")
+    - Complete nutritional information
+    - High-quality photos
+    - Properly formatted instructions
+
+    Args:
+        recipe_name: The recipe name (e.g., "Chipotle Beef Chilli Bowls")
+        source: Provider - "hellofresh", "marleyspoon", or "dinnerly"
+        url: Direct URL to recipe page (alternative to source)
+
+    Returns:
+        Structured recipe data ready for create_recipe, including image_url
+    """
+    return await lookup_recipe_online(recipe_name, source, url)
 
 
 # Register meal plan tools
