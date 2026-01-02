@@ -26,6 +26,7 @@ from mealie_mcp.tools.recipes_write import (
     import_recipe_from_url,
     mark_recipe_made,
     update_recipe,
+    upload_recipe_image,
 )
 from mealie_mcp.tools.shopping import (
     add_to_shopping_list,
@@ -43,33 +44,53 @@ mcp = FastMCP(
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
-RECIPE MANAGEMENT:
-- Use search_recipes to find recipes by name, tags, or categories
-- Use get_recipe to get full details including ingredients and instructions
-- Use create_recipe to add new recipes with full structured data (ingredients, instructions, nutrition)
-- Use update_recipe to modify existing recipes
-- Use import_recipe_from_url to import from websites with good schema.org markup
-- Use delete_recipe to remove recipes
+## RECIPE CREATION - AI INTELLIGENCE REQUIRED
 
-COOKING TRACKING:
-- Use mark_recipe_made when someone cooks a recipe (updates last-made timestamp)
-- Use add_recipe_note to record cooking notes, modifications, or observations
-- Use get_recipe_timeline to see a recipe's history
+When creating recipes from meal-kit cards (HelloFresh, Marley Spoon, etc.) or other sources:
 
-MEAL PLANNING:
-- Use get_meal_plan to see what's planned for a date range
-- Use create_meal_plan_entry to add recipes to the meal plan
-- Use delete_meal_plan_entry to remove from meal plan
+### 1. CONVERT PROPRIETARY MEASUREMENTS
+Transform meal-kit packaging to standard cooking units:
+- "1 packet spice blend" → estimate actual amount (typically 2 tbsp / 15g)
+- "1 sachet paste" → typically 20-30g or 1-2 tbsp
+- "1 packet cheese" → estimate weight (e.g., "100g shredded cheddar")
+- "1 tin tomatoes" → specify size (e.g., "400g tin crushed tomatoes")
 
-SHOPPING:
-- Use get_shopping_list to see current items
-- Use add_to_shopping_list to add ingredients or items
-- Use clear_checked_items to clean up purchased items
+### 2. EXPAND PROPRIETARY SPICE BLENDS
+Replace branded blends with component spices:
+- "Southwest spice blend" → "1 tsp cumin, 1 tsp smoked paprika, ½ tsp chili powder, ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
+- "Italian seasoning" → "1 tsp oregano, 1 tsp basil, ½ tsp thyme, ½ tsp rosemary"
+- "Tuscan seasoning" → "1 tsp rosemary, 1 tsp thyme, ½ tsp oregano, ½ tsp garlic powder"
+- "Mexican spice blend" → "1 tsp cumin, 1 tsp paprika, ½ tsp oregano, ½ tsp chili powder"
 
-When parsing recipes from text, images, or URLs for create_recipe, structure the data carefully:
-- Extract quantities, units, and food names from ingredient text
-- Number instructions sequentially
-- Estimate nutrition per serving when not provided (calories, protein, carbs, fat)""",
+### 3. UPLOAD PHOTOS
+After creating a recipe, use upload_recipe_image with:
+- The FINAL PLATED DISH photo (not raw ingredients)
+- Crop/focus on the food presentation
+- Base64 encode the image data
+
+## RECIPE MANAGEMENT
+- search_recipes: Find by name, tags, or categories
+- get_recipe: Get full details with ingredients/instructions
+- create_recipe: Add new recipes (apply AI transformations above)
+- update_recipe: Modify existing recipes
+- upload_recipe_image: Add photo after creating recipe
+- import_recipe_from_url: Import from sites with schema.org markup
+- delete_recipe: Remove recipes
+
+## COOKING TRACKING
+- mark_recipe_made: Record when a recipe is cooked
+- add_recipe_note: Add cooking notes, modifications, observations
+- get_recipe_timeline: View recipe history
+
+## MEAL PLANNING
+- get_meal_plan: View planned meals for date range
+- create_meal_plan_entry: Add recipe to meal plan
+- delete_meal_plan_entry: Remove from meal plan
+
+## SHOPPING
+- get_shopping_list: View current items
+- add_to_shopping_list: Add ingredients
+- clear_checked_items: Remove purchased items""",
 )
 
 
@@ -424,6 +445,32 @@ async def tool_get_recipe_timeline(slug: str, limit: int = 20) -> list[dict] | d
         List of timeline events
     """
     return await get_recipe_timeline(slug, limit)
+
+
+@mcp.tool()
+async def tool_upload_recipe_image(
+    slug: str,
+    image_base64: str,
+    extension: str = "jpg",
+) -> dict:
+    """Upload an image for a recipe.
+
+    Call this after create_recipe to add a photo of the finished dish.
+
+    IMPORTANT - Image Selection:
+    - Use the FINAL PLATED DISH photo, not raw ingredients
+    - Crop to focus on food presentation
+    - If extracting from PDF, select the hero/beauty shot
+
+    Args:
+        slug: Recipe slug (from create_recipe response)
+        image_base64: Base64-encoded image data (can include data URI prefix)
+        extension: Format - "jpg" (recommended), "png", or "webp"
+
+    Returns:
+        Upload confirmation
+    """
+    return await upload_recipe_image(slug, image_base64, extension)
 
 
 def main():

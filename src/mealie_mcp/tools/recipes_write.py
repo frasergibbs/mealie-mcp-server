@@ -47,35 +47,59 @@ async def create_recipe(
 ) -> dict:
     """Create a new recipe with full structured data.
 
-    Claude can parse recipes from any source (text, images, URLs, verbal descriptions)
-    and provide structured data for this tool.
+    IMPORTANT: Before calling this tool, apply AI intelligence to transform the recipe:
+
+    ## Ingredient Processing Rules
+
+    1. **Proprietary Measurements → Standard Units**:
+       Convert meal-kit measurements to standard cooking units:
+       - "1 packet spice blend" → estimate based on typical amounts (e.g., "2 tbsp" or "15g")
+       - "1 sachet paste" → typically 20-30g, or "1-2 tbsp"
+       - "1 packet cheese" → weigh estimate (e.g., "100g shredded cheese")
+       - "1 tin" → specify size (e.g., "400g tin crushed tomatoes")
+       Use your knowledge of typical meal-kit portions (HelloFresh, Marley Spoon, etc.)
+
+    2. **Proprietary Blends → Component Ingredients**:
+       Expand branded spice blends to their likely components:
+       - "Southwest spice blend" → "1 tsp cumin, 1 tsp paprika, ½ tsp chili powder,
+         ½ tsp garlic powder, ½ tsp onion powder, pinch cayenne"
+       - "Italian seasoning" → "1 tsp dried oregano, 1 tsp dried basil, ½ tsp thyme"
+       - "Tuscan spice mix" → "1 tsp rosemary, 1 tsp thyme, ½ tsp oregano, garlic"
+       Research the specific brand/source if known for accurate substitutions.
+
+    3. **Vague Quantities → Specific Amounts**:
+       - "salt to taste" → keep as-is (this is acceptable)
+       - "olive oil for cooking" → "2 tbsp olive oil" (estimate based on method)
+       - "a knob of butter" → "1 tbsp butter"
+
+    ## Instruction Enhancement
+
+    - Add section titles where logical (Prep, Cook, Sauce, Assembly, etc.)
+    - Ensure temperatures include units (180°C / 350°F)
+    - Clarify timing where vague
+
+    ## After Creation
+
+    If an image is available, call upload_recipe_image with the food photo.
+    Crop/focus on the final plated dish, not raw ingredients.
 
     Args:
         name: Recipe name (required)
-        description: Brief description of the dish
-        ingredients: List of ingredient objects, each with:
-            - display: Full ingredient text (e.g., "2 cups all-purpose flour")
-            - quantity: Numeric amount (e.g., 2.0)
-            - unit: Unit of measure (e.g., "cups")
-            - food: Ingredient name (e.g., "all-purpose flour")
-            - note: Additional notes (e.g., "sifted")
-        instructions: List of instruction objects, each with:
-            - text: Instruction text (required)
-            - title: Optional section header (e.g., "For the sauce")
-        nutrition: Nutrition info per serving with keys:
-            - calories, proteinContent, carbohydrateContent, fatContent
-            - fiberContent, sodiumContent, sugarContent, cholesterolContent
-            - saturatedFatContent, transFatContent, unsaturatedFatContent
-        prep_time: Preparation time (e.g., "15 minutes" or "PT15M")
-        cook_time: Cooking time (e.g., "30 minutes" or "PT30M")
-        total_time: Total time (e.g., "45 minutes" or "PT45M")
-        recipe_yield: Serving size (e.g., "4 servings")
-        tags: List of tag names to apply
-        categories: List of category names to apply
-        source_url: Original recipe URL if imported from web
+        description: Brief appetizing description of the dish
+        ingredients: List of ingredient objects with 'display' text.
+                     Apply the transformation rules above before passing.
+        instructions: List with 'text' and optional 'title' for sections
+        nutrition: Per-serving nutrition (calories, protein, carbs, fat, etc.)
+        prep_time: Preparation time (e.g., "15 minutes")
+        cook_time: Cooking time (e.g., "30 minutes")
+        total_time: Total time (e.g., "45 minutes")
+        recipe_yield: Servings (e.g., "4 servings")
+        tags: Tags like cuisine type, dietary info, source
+        categories: Categories like protein type (Beef, Chicken, Vegetarian)
+        source_url: Original recipe URL if applicable
 
     Returns:
-        Created recipe details with slug for future reference
+        Created recipe with slug for subsequent image upload
     """
     client = get_client()
 
@@ -506,3 +530,51 @@ async def get_recipe_timeline(slug: str, limit: int = 20) -> list[dict] | dict:
         }
         for event in result
     ]
+
+
+async def upload_recipe_image(
+    slug: str,
+    image_base64: str,
+    extension: str = "jpg",
+) -> dict:
+    """Upload an image for a recipe.
+
+    Use this after creating a recipe to add a photo of the finished dish.
+
+    ## Image Selection Guidelines
+
+    When extracting images from PDFs or recipe cards:
+    - Select the FINAL PLATED DISH photo, not raw ingredients
+    - Crop to focus on the food presentation
+    - Prefer landscape orientation for recipe cards
+    - If multiple images exist, choose the most appetizing hero shot
+
+    ## Supported Formats
+
+    - JPEG (jpg) - recommended for photos
+    - PNG (png) - for graphics with transparency
+    - WebP (webp) - modern format, good compression
+
+    Args:
+        slug: Recipe slug (returned from create_recipe)
+        image_base64: Base64-encoded image data.
+                      Can include data URI prefix (data:image/jpeg;base64,...)
+                      or be raw base64 string.
+        extension: Image format - "jpg", "png", or "webp"
+
+    Returns:
+        Upload confirmation with image URL
+    """
+    client = get_client()
+
+    result = await client.upload_recipe_image_from_base64(slug, image_base64, extension)
+
+    if isinstance(result, ErrorResponse):
+        return result.model_dump()
+
+    return {
+        "success": True,
+        "slug": slug,
+        "message": f"Image uploaded for recipe '{slug}'",
+        "image": result.get("image"),
+    }

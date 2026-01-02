@@ -1,5 +1,6 @@
 """Async HTTP client wrapper for Mealie API."""
 
+import base64
 import os
 from datetime import datetime
 from typing import Any
@@ -572,6 +573,71 @@ class MealieClient:
         # Handle paginated response
         items = result.get("items", result) if isinstance(result, dict) else result
         return [TimelineEvent.model_validate(e) for e in items]
+
+    async def upload_recipe_image(
+        self, slug: str, image_data: bytes, extension: str = "jpg"
+    ) -> dict[str, Any] | ErrorResponse:
+        """Upload an image for a recipe.
+
+        Args:
+            slug: Recipe slug
+            image_data: Raw image bytes
+            extension: Image file extension (jpg, png, webp)
+
+        Returns:
+            Upload result or error
+        """
+        client = await self._get_client()
+
+        try:
+            # Use multipart form data for image upload
+            files = {"image": (f"image.{extension}", image_data, f"image/{extension}")}
+            data = {"extension": extension}
+
+            response = await client.put(
+                f"/recipes/{slug}/image",
+                files=files,
+                data=data,
+                headers={"Authorization": f"Bearer {self.token}"},
+            )
+
+            if response.status_code == 401:
+                return ErrorResponse.auth_error("Invalid or expired Mealie API token")
+
+            if response.status_code == 404:
+                return ErrorResponse.not_found("Recipe", slug)
+
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as e:
+            return ErrorResponse.api_error(f"HTTP {e.response.status_code}: {e.response.text}")
+        except Exception as e:
+            return ErrorResponse.api_error(f"Image upload failed: {str(e)}")
+
+    async def upload_recipe_image_from_base64(
+        self, slug: str, base64_data: str, extension: str = "jpg"
+    ) -> dict[str, Any] | ErrorResponse:
+        """Upload an image for a recipe from base64 data.
+
+        Args:
+            slug: Recipe slug
+            base64_data: Base64-encoded image data (with or without data URI prefix)
+            extension: Image file extension (jpg, png, webp)
+
+        Returns:
+            Upload result or error
+        """
+        # Strip data URI prefix if present
+        if "," in base64_data:
+            base64_data = base64_data.split(",", 1)[1]
+
+        try:
+            image_bytes = base64.b64decode(base64_data)
+        except Exception as e:
+            return ErrorResponse.validation_error(f"Invalid base64 data: {str(e)}")
+
+        return await self.upload_recipe_image(slug, image_bytes, extension)
 
 
 # Global client instance
