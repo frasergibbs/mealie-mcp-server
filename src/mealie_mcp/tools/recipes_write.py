@@ -136,6 +136,33 @@ async def create_recipe(
     Returns:
         Created recipe with slug for subsequent image upload
     """
+    # Check for untransformed proprietary measurements
+    proprietary_patterns = [
+        "packet", "sachet", "bag of", "punnet", "bunch of",
+    ]
+    if ingredients:
+        untransformed = []
+        for ing in ingredients:
+            display = ing.get("display", "").lower()
+            for pattern in proprietary_patterns:
+                if pattern in display:
+                    untransformed.append(ing.get("display", ""))
+                    break
+        if untransformed:
+            return {
+                "error": True,
+                "code": "UNTRANSFORMED_INGREDIENTS",
+                "message": "Ingredients contain proprietary measurements that must be transformed to standard units before saving.",
+                "untransformed_ingredients": untransformed[:5],  # Show first 5
+                "examples": {
+                    "1 packet spice blend": "2 tbsp (15g) mixed spices",
+                    "1 sachet garlic seasoning": "1 tsp garlic powder, 1 tsp dried herbs",
+                    "1 packet cheese": "100g grated cheese",
+                    "1 bag salad leaves": "100g mixed salad leaves",
+                },
+                "action": "Transform these ingredients to standard measurements, then call create_recipe again.",
+            }
+
     client = get_client()
 
     # First create the recipe with just the name
