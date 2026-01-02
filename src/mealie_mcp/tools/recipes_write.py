@@ -258,13 +258,22 @@ async def update_recipe(
     Claude can help modify recipes - scaling servings, substituting ingredients,
     adjusting cooking times, or adding missing nutrition data.
 
+    ## Adding Missing Nutrition
+
+    Use this to add nutrition to recipes that were imported without it.
+    Estimate per-serving values based on ingredients:
+    - calories, proteinContent, carbohydrateContent, fatContent (required)
+    - fiberContent, sodiumContent, sugarContent (recommended)
+
+    See create_recipe docstring for detailed estimation guidelines.
+
     Args:
         slug: Recipe slug or ID (required)
         name: New recipe name
         description: Updated description
         ingredients: Complete ingredient list (replaces existing)
         instructions: Complete instruction list (replaces existing)
-        nutrition: Updated nutrition info
+        nutrition: Nutrition dict - use to add missing data to imported recipes
         prep_time: New preparation time
         cook_time: New cooking time
         total_time: New total time
@@ -390,6 +399,11 @@ async def import_recipe_from_url(url: str, include_tags: bool = False) -> dict:
 
     Use this for sites with good structured data (schema.org markup).
     For sites without good markup, use create_recipe with Claude-parsed data instead.
+
+    IMPORTANT: After importing, check if nutrition data was included.
+    If the imported recipe lacks nutrition, use update_recipe to add estimated
+    nutrition based on the ingredients. See create_recipe for nutrition estimation
+    guidelines.
 
     Args:
         url: Recipe URL to import
