@@ -44,6 +44,7 @@ class MealieClient:
         self.token = token or os.getenv("MEALIE_TOKEN", "")
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._group_id: str | None = None  # Cache the user's group ID
 
     @property
     def headers(self) -> dict[str, str]:
@@ -63,6 +64,18 @@ class MealieClient:
                 timeout=self.timeout,
             )
         return self._client
+
+    async def get_group_id(self) -> str | None:
+        """Get the current user's group ID (cached after first call)."""
+        if self._group_id is not None:
+            return self._group_id
+
+        result = await self._request("GET", "/users/self")
+        if isinstance(result, dict) and "groupId" in result:
+            self._group_id = result["groupId"]
+            return self._group_id
+
+        return None
 
     async def close(self) -> None:
         """Close the HTTP client."""

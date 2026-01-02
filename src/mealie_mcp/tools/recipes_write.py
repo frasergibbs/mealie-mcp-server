@@ -166,13 +166,21 @@ async def create_recipe(
     if recipe_yield:
         update_data["recipeYield"] = recipe_yield
 
+    if tags or categories:
+        # Mealie requires groupId for tags and categories
+        group_id = await client.get_group_id()
+
     if tags:
-        # Tags need both name and slug
-        update_data["tags"] = [{"name": t, "slug": _slugify(t)} for t in tags]
+        # Tags need name, slug, and groupId
+        update_data["tags"] = [
+            {"name": t, "slug": _slugify(t), "groupId": group_id} for t in tags
+        ]
 
     if categories:
-        # Categories need both name and slug
-        update_data["recipeCategory"] = [{"name": c, "slug": _slugify(c)} for c in categories]
+        # Categories need name, slug, and groupId
+        update_data["recipeCategory"] = [
+            {"name": c, "slug": _slugify(c), "groupId": group_id} for c in categories
+        ]
 
     if source_url:
         update_data["orgURL"] = source_url
@@ -291,11 +299,19 @@ async def update_recipe(
     if recipe_yield:
         update_data["recipeYield"] = recipe_yield
 
+    if tags or categories:
+        # Mealie requires groupId for tags and categories
+        group_id = await client.get_group_id()
+
     if tags:
-        update_data["tags"] = [{"name": t, "slug": _slugify(t)} for t in tags]
+        update_data["tags"] = [
+            {"name": t, "slug": _slugify(t), "groupId": group_id} for t in tags
+        ]
 
     if categories:
-        update_data["recipeCategory"] = [{"name": c, "slug": _slugify(c)} for c in categories]
+        update_data["recipeCategory"] = [
+            {"name": c, "slug": _slugify(c), "groupId": group_id} for c in categories
+        ]
 
     if rating is not None:
         update_data["rating"] = rating
