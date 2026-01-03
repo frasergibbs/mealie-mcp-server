@@ -493,7 +493,13 @@ async def tool_upload_recipe_image(
 
 
 def main():
-    """Run the MCP server."""
+    """Run the MCP server with support for multiple transports.
+    
+    Transports:
+    - stdio: Local subprocess communication (Claude Desktop) - DEFAULT
+    - sse: Legacy Server-Sent Events (deprecated but still works)
+    - streamable-http: Modern HTTP transport with OAuth 2.1 (Claude Mobile)
+    """
     # Validate required environment variables
     if not os.getenv("MEALIE_URL"):
         print("Warning: MEALIE_URL not set, using default http://localhost:9000/api", file=sys.stderr)
@@ -502,16 +508,46 @@ def main():
         print("Error: MEALIE_TOKEN environment variable is required", file=sys.stderr)
         sys.exit(1)
 
-    # Run the server
-    # For stdio transport (Claude Desktop), just run directly
-    # For SSE transport (remote), use: mcp.run(transport="sse", host="0.0.0.0", port=8080)
+    # Determine transport from environment
     transport = os.getenv("MCP_TRANSPORT", "stdio")
 
-    if transport == "sse":
+    if transport == "streamable-http":
+        # Modern Streamable HTTP transport with OAuth 2.1 (for Claude Mobile)
+        from mealie_mcp.transports import StreamableHTTPServer
+        
+        # Check if OAuth is required
+        require_auth = os.getenv("MCP_REQUIRE_AUTH", "true").lower() == "true"
+        
+        if require_auth and (not os.getenv("OAUTH_SERVER_URL") or not os.getenv("MCP_RESOURCE_URI")):
+            print("Error: OAUTH_SERVER_URL and MCP_RESOURCE_URI required for OAuth authentication", file=sys.stderr)
+            print("Set MCP_REQUIRE_AUTH=false to disable authentication (development only)", file=sys.stderr)
+            sys.exit(1)
+        
+        server = StreamableHTTPServer(
+            mcp,
+            require_auth=require_auth,
+            auth_server_url=os.getenv("OAUTH_SERVER_URL"),
+            resource_uri=os.getenv("MCP_RESOURCE_URI"),
+        )
+        
+        host = os.getenv("MCP_HOST", "0.0.0.0")
+        port = int(os.getenv("MCP_PORT", "8080"))
+        
+        print(f"Starting Streamable HTTP server on {host}:{port}", file=sys.stderr)
+        print(f"OAuth: {'enabled' if require_auth else 'disabled (DEVELOPMENT ONLY)'}", file=sys.stderr)
+        
+        server.run(host=host, port=port)
+        
+    elif transport == "sse":
+        # Legacy SSE transport for backwards compatibility
+        print("Warning: Using deprecated SSE transport. Consider upgrading to streamable-http", file=sys.stderr)
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "8080"))
         mcp.run(transport="sse", host=host, port=port)
+        
     else:
+        # stdio transport for Claude Desktop (default)
+        print("Running in stdio mode for Claude Desktop", file=sys.stderr)
         mcp.run()
 
 

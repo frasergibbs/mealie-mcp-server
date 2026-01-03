@@ -44,6 +44,11 @@ bulk-import = [
     "anthropic>=0.40.0",
     "click>=8.0.0",
 ]
+oauth = [
+    "python-jose[cryptography]>=3.3.0",  # JWT handling
+    "cryptography>=42.0.0",
+    "sse-starlette>=2.0.0",  # Server-Sent Events support
+]
 
 [project.scripts]
 mealie-mcp = "mealie_mcp.server:main"

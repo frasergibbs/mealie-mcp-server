@@ -1,0 +1,74 @@
+version: v1.11.8
+
+dsn: postgres://hydra:secret@postgres:5432/hydra?sslmode=disable
+
+webfinger:
+  jwks:
+    broadcast_keys:
+      - hydra.openid.id-token
+  oidc_discovery:
+    supported_claims:
+      - sub
+      - name
+      - email
+    supported_scope:
+      - offline
+      - openid
+
+urls:
+  self:
+    issuer: http://localhost:4444
+  consent: http://localhost:3000/consent
+  login: http://localhost:3000/login
+  error: http://localhost:3000/error
+  post_logout_redirect: http://localhost:3000/logout
+
+strategies:
+  access_token: jwt
+  scope: exact
+
+ttl:
+  access_token: 1h
+  refresh_token: 720h  # 30 days
+  id_token: 1h
+  auth_code: 10m
+  login_consent_request: 30m
+
+oauth2:
+  expose_internal_errors: true
+  pkce:
+    enforced: true
+    enforced_for_public_clients: true
+  grant:
+    jwt:
+      max_ttl: 1h
+  session:
+    encrypt_at_rest: true
+
+secrets:
+  system:
+    - this-is-the-primary-secret-replace-it-with-a-real-secret
+
+serve:
+  cookies:
+    same_site_mode: Lax
+    same_site_legacy_workaround: false
+  public:
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - Accept
+      exposed_headers:
+        - Content-Type
+        - Mcp-Session-Id
+      allow_credentials: true
