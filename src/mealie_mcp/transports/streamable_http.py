@@ -51,7 +51,10 @@ class StreamableHTTPServer:
 
         # OAuth configuration
         if require_auth:
+            # Internal URL for token introspection (admin API)
             self.auth_server_url = auth_server_url or os.getenv("OAUTH_SERVER_URL")
+            # Public URL for OAuth discovery (public API)
+            self.auth_public_url = os.getenv("OAUTH_PUBLIC_URL", self.auth_server_url)
             self.resource_uri = resource_uri or os.getenv("MCP_RESOURCE_URI")
 
             if not self.auth_server_url or not self.resource_uri:
@@ -62,6 +65,7 @@ class StreamableHTTPServer:
             self.token_validator = TokenValidator(self.auth_server_url, self.resource_uri)
         else:
             self.auth_server_url = None
+            self.auth_public_url = None
             self.resource_uri = "http://localhost:8080"
             self.token_validator = None
 
@@ -84,7 +88,7 @@ class StreamableHTTPServer:
 
             return {
                 "resource": self.resource_uri,
-                "authorization_servers": [self.auth_server_url],
+                "authorization_servers": [self.auth_public_url],
                 "bearer_methods_supported": ["header"],
                 "resource_documentation": "https://github.com/frasergibbs/mealie-mcp-server",
             }
