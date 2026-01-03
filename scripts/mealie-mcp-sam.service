@@ -19,6 +19,7 @@ Environment="MCP_PORT=8081"
 Environment="MCP_USER=sam"
 Environment="MCP_BASE_URL=https://rainworth-server.tailbf31d9.ts.net/sam"
 EnvironmentFile=/home/fraser/Repos/mealie-mcp-server/.env
+EnvironmentFile=/home/fraser/.config/mealie-sam.env
 ExecStart=/home/fraser/Repos/mealie-mcp-server/.venv/bin/python -m mealie_mcp.server
 Restart=on-failure
 RestartSec=10
