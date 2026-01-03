@@ -5,6 +5,7 @@ In production, you'd want proper user authentication, session management, etc.
 """
 
 import os
+import sys
 from urllib.parse import urlencode
 
 import requests
@@ -199,8 +200,8 @@ def consent():
     
     # Process consent
     action = request.form.get("action")
-    print(f"DEBUG: Consent form data: {dict(request.form)}")
-    print(f"DEBUG: action = {action!r}")
+    print(f"DEBUG: Consent form data: {dict(request.form)}", file=sys.stderr, flush=True)
+    print(f"DEBUG: action = {action!r}", file=sys.stderr, flush=True)
     
     if action == "allow":
         # Accept consent
