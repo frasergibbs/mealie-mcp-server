@@ -171,8 +171,8 @@ def login():
             params={"login_challenge": login_challenge},
             json={
                 "subject": username,  # User identifier
-                "remember": True,
-                "remember_for": 3600,
+                "remember": False,  # Don't remember login to ensure proper multi-user auth
+                "remember_for": 0,
             },
             timeout=10,
         )
