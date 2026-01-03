@@ -54,6 +54,10 @@ serve:
     same_site_mode: None
     same_site_legacy_workaround: true
   public:
+    request_log:
+      disable_for_health: true
+    override_trust_forwarded_headers: true
+    override_return_to_urls_allowed: true
     cors:
       enabled: true
       allowed_origins:
