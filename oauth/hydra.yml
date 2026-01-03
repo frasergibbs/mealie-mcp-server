@@ -17,7 +17,7 @@ webfinger:
 
 urls:
   self:
-    issuer: http://localhost:4444
+    issuer: https://rainworth-server.tailbf31d9.ts.net/oauth
   consent: http://localhost:3000/consent
   login: http://localhost:3000/login
   error: http://localhost:3000/error
