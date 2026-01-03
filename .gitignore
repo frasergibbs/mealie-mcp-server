@@ -58,3 +58,7 @@ Thumbs.db
 
 # Recipes
 /recipes*
+
+# Bulk import cache
+scripts/bulk_import_hellofresh/.image_cache/
+scripts/bulk_import_hellofresh/.cache/

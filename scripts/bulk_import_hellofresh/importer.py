@@ -9,11 +9,61 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Load environment variables from repo root
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
 # Add src to path for mealie_mcp imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from mealie_mcp.client import MealieClient
 from mealie_mcp.models import ErrorResponse
+
+
+async def check_recipe_exists(client: MealieClient, url: str) -> str | None:
+    """Check if recipe with this URL already exists.
+
+    Args:
+        client: Mealie client instance
+        url: Original recipe URL
+
+    Returns:
+        Recipe slug if exists, None otherwise
+    """
+    # Search all recipes to check orgURL
+    # Mealie API doesn't support searching by orgURL directly, so we need to fetch and check
+    page = 1
+    per_page = 100
+    
+    while True:
+        result = await client.search_recipes(page=page, per_page=per_page)
+        
+        if isinstance(result, ErrorResponse):
+            # If search fails, assume doesn't exist to avoid blocking imports
+            return None
+        
+        if not result:
+            # No more results
+            break
+        
+        # Check each recipe's orgURL
+        for recipe_summary in result:
+            # Need to fetch full recipe to check orgURL
+            full_recipe = await client.get_recipe(recipe_summary.slug)
+            if isinstance(full_recipe, ErrorResponse):
+                continue
+            
+            if hasattr(full_recipe, "org_url") and full_recipe.org_url == url:
+                return recipe_summary.slug
+        
+        # If we got fewer results than per_page, we're on the last page
+        if len(result) < per_page:
+            break
+        
+        page += 1
+    
+    return None
 
 
 async def import_recipe(
@@ -91,6 +141,7 @@ async def bulk_import(
         "failed": [],
         "skipped_no_match": skipped_no_match,
         "skipped_low_confidence": skipped_low_confidence,
+        "skipped_duplicate": [],
         "dry_run": dry_run,
     }
 
@@ -115,6 +166,18 @@ async def bulk_import(
                 progress_callback(i, total, None)
 
             print(f"  [{i+1}/{total}] Importing: {match.get('matched_name', url)[:50]}...")
+
+            # Check for duplicates by searching for orgURL
+            existing = await check_recipe_exists(client, url)
+            if existing:
+                results["skipped_duplicate"].append({
+                    **match,
+                    "existing_slug": existing,
+                })
+                print(f"    ⊘ Already exists: {existing}")
+                if progress_callback:
+                    progress_callback(i + 1, total, {"success": True, "duplicate": True})
+                continue
 
             result = await import_recipe(client, url, include_tags)
 
@@ -155,8 +218,9 @@ def summarize_results(results: dict) -> None:
     failed = len(results.get("failed", []))
     skipped_no_match = len(results.get("skipped_no_match", []))
     skipped_low_conf = len(results.get("skipped_low_confidence", []))
+    skipped_duplicate = len(results.get("skipped_duplicate", []))
 
-    total = imported + failed + skipped_no_match + skipped_low_conf
+    total = imported + failed + skipped_no_match + skipped_low_conf + skipped_duplicate
 
     print("\n" + "=" * 50)
     print("IMPORT SUMMARY")
@@ -170,6 +234,7 @@ def summarize_results(results: dict) -> None:
     print(f"Total recipes processed: {total}")
     print(f"  ✓ Imported:              {imported}")
     print(f"  ✗ Failed:                {failed}")
+    print(f"  ⊘ Skipped (duplicate):   {skipped_duplicate}")
     print(f"  ○ Skipped (no match):    {skipped_no_match}")
     print(f"  ○ Skipped (low conf):    {skipped_low_conf}")
 
@@ -179,6 +244,14 @@ def summarize_results(results: dict) -> None:
             print(f"  - {f.get('scanned')}: {f.get('error')}")
         if failed > 5:
             print(f"  ... and {failed - 5} more")
+    
+    if skipped_duplicate > 0:
+        print(f"\nSkipped {skipped_duplicate} duplicate(s) (already in Mealie):")
+        for d in results.get("skipped_duplicate", [])[:5]:
+            print(f"  - {d.get('scanned')} → {d.get('existing_slug')}")
+        if skipped_duplicate > 5:
+            print(f"  ... and {skipped_duplicate - 5} more")
+
 
 
 def save_results(results: dict, output_path: str | Path) -> None:

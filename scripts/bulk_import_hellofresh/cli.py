@@ -11,6 +11,7 @@ except ImportError:
     raise ImportError("Click not installed. Run: pip install 'mealie-mcp[bulk-import]'")
 
 from . import sitemap, ocr, matcher, importer
+from .qa import runner as qa_runner
 
 
 @click.group()
@@ -380,6 +381,170 @@ def search_sitemap(country: str, search_term: str):
             click.echo(f"    {r['url']}")
         if len(matches) > 20:
             click.echo(f"\n  ... and {len(matches) - 20} more")
+
+    asyncio.run(run())
+
+
+@cli.command()
+@click.option(
+    "--phase", "-p",
+    type=click.Choice(["nutrition", "measurements", "tags"]),
+    help="Run specific phase only (default: all phases)",
+)
+@click.option(
+    "--category", "-c",
+    default="hellofresh",
+    help="Category slug to filter recipes (default: hellofresh)",
+)
+@click.option(
+    "--limit",
+    type=int,
+    help="Maximum number of recipes to process",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be changed without making changes",
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(),
+    help="Directory to save QA results",
+)
+def qa(
+    phase: str | None,
+    category: str | None,
+    limit: int | None,
+    dry_run: bool,
+    output: str | None,
+):
+    """Run QA/QC pipeline on imported recipes.
+
+    Post-import quality enhancement:
+    
+    \b
+    Phase 1 - nutrition:     Calculate missing nutrition data
+    Phase 2 - measurements:  Normalize sachets/packets to standard units  
+    Phase 3 - tags:          Apply protein, cuisine, effort tags
+
+    Examples:
+    
+    \b
+    # Run full QA on HelloFresh recipes
+    python -m scripts.bulk_import_hellofresh.cli qa
+    
+    \b
+    # Dry run to see what would change
+    python -m scripts.bulk_import_hellofresh.cli qa --dry-run
+    
+    \b
+    # Run only nutrition phase
+    python -m scripts.bulk_import_hellofresh.cli qa --phase nutrition
+    
+    \b
+    # Process first 10 recipes
+    python -m scripts.bulk_import_hellofresh.cli qa --limit 10
+    """
+    async def run():
+        if dry_run:
+            click.echo("[DRY RUN MODE - no changes will be made]\n")
+        
+        results = await qa_runner.run_qa_pipeline(
+            phase=phase,
+            category=category,
+            limit=limit,
+            dry_run=dry_run,
+            verbose=True,
+            output_dir=output,
+        )
+        
+        if "error" in results:
+            click.echo(f"Error: {results['error']}", err=True)
+            return
+        
+        # Final summary
+        click.echo("\n" + "=" * 50)
+        click.echo("SUMMARY")
+        click.echo("=" * 50)
+        click.echo(f"Total recipes processed: {results.get('total_recipes', 0)}")
+        for phase_name, phase_results in results.get("phases", {}).items():
+            click.echo(f"\n{phase_name.title()}:")
+            for key, value in phase_results.items():
+                click.echo(f"  {key}: {value}")
+
+    asyncio.run(run())
+
+
+@cli.command()
+@click.option(
+    "--category", "-c",
+    default="hellofresh",
+    help="Category slug to filter recipes (default: hellofresh)",
+)
+@click.option(
+    "--limit",
+    type=int,
+    default=5,
+    help="Number of recipes to analyze (default: 5)",
+)
+def qa_preview(category: str | None, limit: int):
+    """Preview recipes that need QA processing.
+
+    Shows which recipes need nutrition calculation, measurement normalization,
+    and tagging before running the full QA pipeline.
+    """
+    async def run():
+        from .qa.nutrition import needs_nutrition
+        from .qa.measurements import has_proprietary_measurements
+        
+        client = qa_runner.MealieClient()
+        
+        try:
+            click.echo(f"Fetching recipes (category: {category})...")
+            recipes = await qa_runner.fetch_recipes_by_category(client, category, limit)
+            
+            if not recipes:
+                click.echo("No recipes found")
+                return
+            
+            click.echo(f"\nAnalyzing {len(recipes)} recipes:\n")
+            
+            needs_nutr = 0
+            needs_meas = 0
+            
+            for recipe in recipes:
+                name = recipe.get("name", "Unknown")
+                slug = recipe.get("slug", "")
+                
+                nutr = needs_nutrition(recipe)
+                meas = has_proprietary_measurements(recipe)
+                
+                if nutr:
+                    needs_nutr += 1
+                if meas:
+                    needs_meas += 1
+                
+                flags = []
+                if nutr:
+                    flags.append("📊 needs nutrition")
+                if meas:
+                    flags.append("📏 has proprietary measurements")
+                flags.append("🏷️ needs tagging")  # All need tags
+                
+                click.echo(f"• {name}")
+                click.echo(f"  Slug: {slug}")
+                for flag in flags:
+                    click.echo(f"  {flag}")
+                click.echo()
+            
+            click.echo("=" * 50)
+            click.echo(f"Summary ({len(recipes)} recipes):")
+            click.echo(f"  Need nutrition: {needs_nutr}")
+            click.echo(f"  Have proprietary measurements: {needs_meas}")
+            click.echo(f"  Need tagging: {len(recipes)} (all)")
+        
+        finally:
+            await client.close()
 
     asyncio.run(run())
 

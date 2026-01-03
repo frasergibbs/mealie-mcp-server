@@ -259,12 +259,19 @@ class MealieClient:
 
         Args:
             date: Date for the meal (YYYY-MM-DD)
-            recipe_id: Recipe slug or ID
+            recipe_id: Recipe slug or UUID
             entry_type: Meal type (breakfast, lunch, dinner, side, snack)
 
         Returns:
             Created meal plan entry or error
         """
+        # If recipe_id looks like a slug (not a UUID), look up the UUID
+        if not self._is_uuid(recipe_id):
+            recipe = await self.get_recipe(recipe_id)
+            if isinstance(recipe, ErrorResponse):
+                return recipe
+            recipe_id = recipe.id
+
         body = {
             "date": date,
             "entryType": entry_type,
@@ -277,6 +284,15 @@ class MealieClient:
             return result
 
         return MealPlanEntry.model_validate(result)
+    
+    def _is_uuid(self, value: str) -> bool:
+        """Check if a string is a valid UUID."""
+        import re
+        uuid_pattern = re.compile(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            re.IGNORECASE
+        )
+        return bool(uuid_pattern.match(value))
 
     async def delete_meal_plan_entry(self, entry_id: str) -> dict[str, Any] | ErrorResponse:
         """Delete a meal plan entry.
