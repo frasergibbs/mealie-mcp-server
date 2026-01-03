@@ -90,11 +90,18 @@ CONSENT_TEMPLATE = """
         <li>Access shopping lists</li>
     </ul>
     
-    <form method="post" style="margin-top: 30px;">
+    <form method="post" style="margin-top: 30px;" id="consentForm">
         <input type="hidden" name="consent_challenge" value="{{ consent_challenge }}">
-        <button type="submit" name="action" value="allow" class="allow">Allow Access</button>
-        <button type="submit" name="action" value="deny" class="deny">Deny</button>
+        <button type="submit" name="action" value="allow" class="allow" id="allowBtn">Allow Access</button>
+        <button type="submit" name="action" value="deny" class="deny" id="denyBtn">Deny</button>
     </form>
+    
+    <script>
+        document.getElementById('consentForm').addEventListener('submit', function() {
+            document.getElementById('allowBtn').disabled = true;
+            document.getElementById('denyBtn').disabled = true;
+        });
+    </script>
 </body>
 </html>
 """
