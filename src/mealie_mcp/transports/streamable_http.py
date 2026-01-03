@@ -89,7 +89,7 @@ class StreamableHTTPServer:
                 "resource_documentation": "https://github.com/frasergibbs/mealie-mcp-server",
             }
 
-        @self.app.post("/mcp-mealie")
+        @self.app.post("/")
         async def mcp_endpoint(
             request: Request,
             authorization: str | None = Header(None),
@@ -155,7 +155,7 @@ class StreamableHTTPServer:
                 logger.debug(f"Received notification/response: {message.get('method', 'response')}")
                 return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={})
 
-        @self.app.get("/mcp")
+        @self.app.get("/")
         async def mcp_listen(
             request: Request,
             authorization: str | None = Header(None),
@@ -191,43 +191,7 @@ class StreamableHTTPServer:
                     logger.error(f"SSE stream error: {e}")
 
             return EventSourceResponse(event_stream())
-        @self.app.get("/mcp-mealie")
-        async def mcp_listen(
-            request: Request,
-            authorization: str | None = Header(None),
-            mcp_session_id: str | None = Header(None, alias="Mcp-Session-Id"),
-        ):
-            """Listen endpoint - opens SSE stream for server-to-client messages.
-
-            Allows server to send notifications/requests to client without client first sending data.
-            """
-            # Validate OAuth token if auth required
-            if self.require_auth:
-                token = self.token_validator.parse_authorization_header(authorization)
-                await self.token_validator.validate(token)
-
-            # Validate session exists
-            if not mcp_session_id or mcp_session_id not in self.sessions:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Valid Mcp-Session-Id required for listen endpoint",
-                )
-
-            async def event_stream():
-                """Generator for SSE events."""
-                # Keep connection open for server-initiated messages
-                # In practice, MCP servers rarely initiate messages in this transport
-                try:
-                    while True:
-                        # This would check for pending server messages to send
-                        # For now, just keep connection alive
-                        await asyncio.sleep(30)
-                        yield {"event": "ping", "data": ""}
-                except Exception as e:
-                    logger.error(f"SSE stream error: {e}")
-
-            return EventSourceResponse(event_stream())
-        @self.app.delete("/mcp-mealie")
+        @self.app.delete("/")
         async def mcp_terminate(
             authorization: str | None = Header(None),
             mcp_session_id: str | None = Header(None, alias="Mcp-Session-Id"),
