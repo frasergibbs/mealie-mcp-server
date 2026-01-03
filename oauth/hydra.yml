@@ -53,8 +53,9 @@ serve:
   cookies:
     same_site_mode: None
     same_site_legacy_workaround: true
-    domain: rainworth-server.tailbf31d9.ts.net
-    path: /
+  admin:
+    request_log:
+      disable_for_health: true
   public:
     request_log:
       disable_for_health: true
