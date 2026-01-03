@@ -13,6 +13,15 @@ from flask import Flask, redirect, render_template_string, request
 app = Flask(__name__)
 HYDRA_ADMIN_URL = os.getenv("HYDRA_ADMIN_URL", "http://localhost:4445")
 
+# User authentication - format: "username:password,username2:password2"
+ALLOWED_USERS = {}
+users_str = os.getenv("ALLOWED_USERS", "")
+if users_str:
+    for user_pair in users_str.split(","):
+        if ":" in user_pair:
+            username, password = user_pair.split(":", 1)
+            ALLOWED_USERS[username.strip()] = password.strip()
+
 
 # Simple login template
 LOGIN_TEMPLATE = """
@@ -107,13 +116,27 @@ def login():
     username = request.form.get("username")
     password = request.form.get("password")
     
-    # SIMPLIFIED: Accept any username/password
-    # In production, validate against real user database
+    # Validate credentials
     if not username or not password:
         return render_template_string(
             LOGIN_TEMPLATE,
             login_challenge=login_challenge,
             error="Username and password required"
+        )
+    
+    # Check against allowed users
+    if not ALLOWED_USERS:
+        return render_template_string(
+            LOGIN_TEMPLATE,
+            login_challenge=login_challenge,
+            error="No users configured. Set ALLOWED_USERS environment variable."
+        )
+    
+    if username not in ALLOWED_USERS or ALLOWED_USERS[username] != password:
+        return render_template_string(
+            LOGIN_TEMPLATE,
+            login_challenge=login_challenge,
+            error="Invalid username or password"
         )
     
     # Accept the login challenge
