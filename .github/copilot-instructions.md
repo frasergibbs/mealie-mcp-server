@@ -1,4 +1,5 @@
-# Mealie MCP Server - Copilot Instructions
+  
+  # Mealie MCP Server - Copilot Instructions
 
 ## Project Overview
 Python MCP (Model Context Protocol) server that integrates with a self-hosted Mealie instance for AI-powered meal planning via Claude.
@@ -60,3 +61,49 @@ ruff check src/ tests/
 - `MCP_AUTH_TOKEN` - MCP server authentication token
 - `MCP_HOST` - Server host (default: 0.0.0.0)
 - `MCP_PORT` - Server port (default: 8080)
+
+## Production Deployment
+
+### Server Details
+- **Host**: rainworth-server (ssh: fraser@rainworth-server)
+- **Install Path**: ~/Repos/mealie-mcp-server
+- **Service**: systemd user service at ~/.config/systemd/user/mealie-mcp.service
+- **Python**: Virtual environment at .venv/bin/python
+
+### Deployment Process
+```bash
+# Standard deployment workflow
+ssh fraser@rainworth-server "cd ~/Repos/mealie-mcp-server && git pull && systemctl --user restart mealie-mcp && sleep 2 && systemctl --user status mealie-mcp"
+
+# Check service status
+ssh fraser@rainworth-server "systemctl --user status mealie-mcp"
+
+# View logs
+ssh fraser@rainworth-server "journalctl --user -u mealie-mcp -f"
+```
+
+### Service Management
+```bash
+# Restart service
+systemctl --user restart mealie-mcp
+
+# Start/stop service
+systemctl --user start mealie-mcp
+systemctl --user stop mealie-mcp
+
+# Enable/disable autostart
+systemctl --user enable mealie-mcp
+systemctl --user disable mealie-mcp
+```
+
+## Implementation Notes
+
+### Recipe ID Handling
+- The `create_meal_plan_entry` tool accepts both recipe slugs and UUIDs
+- Slugs are automatically resolved to UUIDs via API lookup
+- UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
+
+### Pydantic Model Types
+- `MealPlanEntry.id` accepts both `str` and `int` due to API inconsistency
+- Mealie API returns integer IDs for meal plan entries
+- Other models use string IDs consistently
