@@ -37,6 +37,13 @@ dev = [
     "pytest-httpx>=0.30.0",
     "ruff>=0.3.0",
 ]
+bulk-import = [
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.16.0",
+    "Pillow>=10.0.0",
+    "anthropic>=0.40.0",
+    "click>=8.0.0",
+]
 
 [project.scripts]
 mealie-mcp = "mealie_mcp.server:main"
