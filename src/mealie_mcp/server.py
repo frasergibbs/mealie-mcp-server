@@ -43,25 +43,15 @@ load_dotenv()
 
 # Get user-specific configuration from environment
 mcp_user = os.getenv("MCP_USER", "unknown")
-base_url = os.getenv("MCP_BASE_URL", "https://rainworth-server.tailbf31d9.ts.net")
-
-# Set up basic OAuth provider for Dynamic Client Registration
-# Single-tenant: each server instance serves one user's Mealie account
-auth_provider = InMemoryOAuthProvider(
-    base_url=base_url,
-    client_registration_options=ClientRegistrationOptions(
-        enabled=True,  # Enable Dynamic Client Registration for Claude
-        valid_scopes=["mcp"],  # Define available scopes
-    ),
-)
 
 print(f"Starting Mealie MCP server for user: {mcp_user}", file=sys.stderr)
-print(f"Base URL: {base_url}", file=sys.stderr)
+print("Security: URL obscurity (no OAuth) - TODO: Add Auth0", file=sys.stderr)
 
-# Create the MCP server with OAuth
+# Create the MCP server without authentication
+# TODO: Add Auth0 OAuth provider for proper user authentication
+# See: https://github.com/frasergibbs/mealie-mcp-server/issues/[NUMBER]
 mcp = FastMCP(
     name=f"mealie-{mcp_user}",
-    auth=auth_provider,
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
