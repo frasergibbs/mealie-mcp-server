@@ -18,10 +18,10 @@ webfinger:
 urls:
   self:
     issuer: https://rainworth-server.tailbf31d9.ts.net/oauth
-  consent: http://localhost:3000/consent
-  login: http://localhost:3000/login
-  error: http://localhost:3000/error
-  post_logout_redirect: http://localhost:3000/logout
+  consent: https://rainworth-server.tailbf31d9.ts.net/consent
+  login: https://rainworth-server.tailbf31d9.ts.net/login
+  error: https://rainworth-server.tailbf31d9.ts.net/error
+  post_logout_redirect: https://rainworth-server.tailbf31d9.ts.net/logout
 
 strategies:
   access_token: jwt
