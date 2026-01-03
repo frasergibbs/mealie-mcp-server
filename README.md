@@ -44,13 +44,29 @@ For testing with MCP Inspector or Claude Desktop:
 python -m mealie_mcp.server
 ```
 
-### Running as Remote Server (SSE mode)
+### Running as HTTP Server with OAuth
 
-For remote access via Tailscale Funnel:
+For remote access via Claude.ai with OAuth authentication:
+
+```bash
+# Set environment variables
+export MCP_TRANSPORT=http
+export MCP_REQUIRE_AUTH=true
+export MCP_BASE_URL=https://your-server.tailxxxxxx.ts.net
+
+# Run server
+python -m mealie_mcp.server
+```
+
+See [FastMCP OAuth Setup Guide](docs/FASTMCP_OAUTH_SETUP.md) for complete OAuth configuration with Tailscale Funnel.
+
+### Legacy SSE Mode (Deprecated)
 
 ```bash
 MCP_TRANSPORT=sse python -m mealie_mcp.server
 ```
+
+> **Note**: SSE transport is deprecated. Use `http` transport with FastMCP's built-in OAuth for remote access.
 
 ## MCP Tools
 
@@ -77,9 +93,12 @@ MCP_TRANSPORT=sse python -m mealie_mcp.server
 |----------|-------------|---------|
 | `MEALIE_URL` | Mealie API base URL | `http://localhost:9000/api` |
 | `MEALIE_TOKEN` | Mealie API bearer token | Required |
-| `MCP_TRANSPORT` | Transport mode: `stdio` or `sse` | `stdio` |
-| `MCP_HOST` | Host to bind (SSE mode only) | `0.0.0.0` |
-| `MCP_PORT` | Port to bind (SSE mode only) | `8080` |
+| `MCP_TRANSPORT` | Transport mode: `stdio` or `http` | `stdio` |
+| `MCP_HOST` | Host to bind (http mode only) | `0.0.0.0` |
+| `MCP_PORT` | Port to bind (http mode only) | `8080` |
+| `MCP_REQUIRE_AUTH` | Enable OAuth authentication | `false` |
+| `MCP_BASE_URL` | Public URL for OAuth (required if auth enabled) | - |
+| `MCP_AUTH_TOKEN` | Portal authentication token | - |
 | `RULES_DATA_DIR` | Directory for storing rules config | `/data` |
 | `PORTAL_HOST` | Host for rules portal | `0.0.0.0` |
 | `PORTAL_PORT` | Port for rules portal | `8081` |
@@ -260,8 +279,8 @@ mealie-mcp-server/
 
 ## Roadmap
 
-- [ ] OAuth 2.1 support for Claude.ai and mobile access
-- [ ] Recipe creation/editing
+- [x] OAuth 2.1 support with Dynamic Client Registration for Claude.ai
+- [ ] Recipe creation/editing (in progress)
 - [ ] Nutritional analysis and filtering
 - [ ] Meal suggestions based on available ingredients
 

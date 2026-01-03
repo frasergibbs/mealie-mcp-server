@@ -6,6 +6,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.auth.auth import ClientRegistrationOptions
+from fastmcp.server.auth.providers.in_memory import InMemoryOAuthProvider
 
 from mealie_mcp.tools.mealplans import (
     create_meal_plan_entry,
@@ -39,9 +41,28 @@ from mealie_mcp.tools.shopping import (
 # Load environment variables
 load_dotenv()
 
+# Set up OAuth provider if authentication is required
+auth_provider = None
+if os.getenv("MCP_REQUIRE_AUTH", "false").lower() == "true":
+    base_url = os.getenv("MCP_BASE_URL")
+    if not base_url:
+        print("Error: MCP_BASE_URL required when MCP_REQUIRE_AUTH=true", file=sys.stderr)
+        print("Example: MCP_BASE_URL=https://rainworth-server.tailbf31d9.ts.net", file=sys.stderr)
+        sys.exit(1)
+    
+    auth_provider = InMemoryOAuthProvider(
+        base_url=base_url,
+        client_registration_options=ClientRegistrationOptions(
+            enabled=True,  # Enable Dynamic Client Registration for Claude
+            valid_scopes=["mcp"],  # Define available scopes
+        ),
+    )
+    print(f"OAuth enabled with Dynamic Client Registration at {base_url}", file=sys.stderr)
+
 # Create the MCP server
 mcp = FastMCP(
     name="mealie",
+    auth=auth_provider,  # Pass auth provider to FastMCP
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
@@ -497,8 +518,7 @@ def main():
     
     Transports:
     - stdio: Local subprocess communication (Claude Desktop) - DEFAULT
-    - sse: Legacy Server-Sent Events (deprecated but still works)
-    - streamable-http: Modern HTTP transport with OAuth 2.1 (Claude Mobile)
+    - http: HTTP transport with FastMCP's built-in OAuth 2.1 + DCR (Claude.ai)
     """
     # Validate required environment variables
     if not os.getenv("MEALIE_URL"):
@@ -511,39 +531,25 @@ def main():
     # Determine transport from environment
     transport = os.getenv("MCP_TRANSPORT", "stdio")
 
-    if transport == "streamable-http":
-        # Modern Streamable HTTP transport with OAuth 2.1 (for Claude Mobile)
-        from mealie_mcp.transports import StreamableHTTPServer
-        
-        # Check if OAuth is required
-        require_auth = os.getenv("MCP_REQUIRE_AUTH", "true").lower() == "true"
-        
-        if require_auth and (not os.getenv("OAUTH_SERVER_URL") or not os.getenv("MCP_RESOURCE_URI")):
-            print("Error: OAUTH_SERVER_URL and MCP_RESOURCE_URI required for OAuth authentication", file=sys.stderr)
-            print("Set MCP_REQUIRE_AUTH=false to disable authentication (development only)", file=sys.stderr)
-            sys.exit(1)
-        
-        server = StreamableHTTPServer(
-            mcp,
-            require_auth=require_auth,
-            auth_server_url=os.getenv("OAUTH_SERVER_URL"),
-            resource_uri=os.getenv("MCP_RESOURCE_URI"),
-        )
-        
+    if transport == "http":
+        # Modern HTTP transport with FastMCP's built-in OAuth 2.1
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "8080"))
         
-        print(f"Starting Streamable HTTP server on {host}:{port}", file=sys.stderr)
-        print(f"OAuth: {'enabled' if require_auth else 'disabled (DEVELOPMENT ONLY)'}", file=sys.stderr)
+        print(f"Starting HTTP server on {host}:{port}", file=sys.stderr)
+        if mcp.auth:
+            print("OAuth: enabled with Dynamic Client Registration (DCR)", file=sys.stderr)
+        else:
+            print("OAuth: disabled (DEVELOPMENT ONLY)", file=sys.stderr)
         
-        server.run(host=host, port=port)
+        mcp.run(transport="http", host=host, port=port)
         
-    elif transport == "sse":
-        # Legacy SSE transport for backwards compatibility
-        print("Warning: Using deprecated SSE transport. Consider upgrading to streamable-http", file=sys.stderr)
-        host = os.getenv("MCP_HOST", "0.0.0.0")
-        port = int(os.getenv("MCP_PORT", "8080"))
-        mcp.run(transport="sse", host=host, port=port)
+    elif transport == "streamable-http" or transport == "sse":
+        # Deprecated transports - guide to use 'http' instead
+        print(f"Error: '{transport}' transport is deprecated", file=sys.stderr)
+        print("Use MCP_TRANSPORT=http with FastMCP's built-in OAuth support", file=sys.stderr)
+        print("FastMCP now includes OAuth 2.1 with Dynamic Client Registration", file=sys.stderr)
+        sys.exit(1)
         
     else:
         # stdio transport for Claude Desktop (default)
