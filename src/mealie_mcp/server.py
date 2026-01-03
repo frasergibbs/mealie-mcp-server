@@ -6,6 +6,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from fastmcp.server.auth.auth import ClientRegistrationOptions
+from fastmcp.server.auth.providers.in_memory import InMemoryOAuthProvider
 
 from mealie_mcp.tools.mealplans import (
     create_meal_plan_entry,
@@ -39,13 +41,27 @@ from mealie_mcp.tools.shopping import (
 # Load environment variables
 load_dotenv()
 
-# OAuth is handled by StreamableHTTPServer with Ory Hydra (not FastMCP's built-in auth)
-# This allows multi-user support with per-user Mealie tokens
+# Get user-specific configuration from environment
+mcp_user = os.getenv("MCP_USER", "unknown")
+base_url = os.getenv("MCP_BASE_URL", "https://rainworth-server.tailbf31d9.ts.net")
 
-# Create the MCP server (no auth provider - handled by custom transport)
+# Set up basic OAuth provider for Dynamic Client Registration
+# Single-tenant: each server instance serves one user's Mealie account
+auth_provider = InMemoryOAuthProvider(
+    base_url=base_url,
+    client_registration_options=ClientRegistrationOptions(
+        enabled=True,  # Enable Dynamic Client Registration for Claude
+        valid_scopes=["mcp"],  # Define available scopes
+    ),
+)
+
+print(f"Starting Mealie MCP server for user: {mcp_user}", file=sys.stderr)
+print(f"Base URL: {base_url}", file=sys.stderr)
+
+# Create the MCP server with OAuth
 mcp = FastMCP(
-    name="mealie",
-    auth=None,  # OAuth handled by StreamableHTTPServer transport
+    name=f"mealie-{mcp_user}",
+    auth=auth_provider,
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
@@ -515,26 +531,37 @@ def main():
     transport = os.getenv("MCP_TRANSPORT", "stdio")
 
     if transport == "http":
-        # HTTP transport with Ory Hydra OAuth 2.1 (for multi-user support)
+        # HTTP transport with FastMCP's built-in OAuth + multi-user token mapping
         import uvicorn
-        from mealie_mcp.transports.streamable_http import StreamableHTTPServer
         
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "8080"))
         
-        print(f"Starting HTTP server with Ory Hydra OAuth on {host}:{port}", file=sys.stderr)
-        print("OAuth: Ory Hydra with multi-user token support", file=sys.stderr)
+        print(f"Starting HTTP server on {host}:{port}", file=sys.stderr)
+        print("OAuth: FastMCP with Dynamic Client Registration", file=sys.stderr)
+        print("Multi-user: OAuth user ID → Mealie token mapping", file=sys.stderr)
         
-        # Create custom transport with Ory Hydra integration
-        server = StreamableHTTPServer(
-            mcp_instance=mcp,
-            require_auth=True,
-            auth_server_url=os.getenv("OAUTH_SERVER_URL"),
-            resource_uri=os.getenv("MCP_RESOURCE_URI"),
-        )
+        # Create ASGI app at /mcp path
+        app = mcp.http_app(path="/mcp")
+        
+        # Add middleware to extract OAuth user and set context
+        from starlette.middleware.base import BaseHTTPMiddleware
+        from mealie_mcp.context import set_current_user
+        
+        class UserContextMiddleware(BaseHTTPMiddleware):
+            async def dispatch(self, request, call_next):
+                # Extract user from OAuth token if present
+                # FastMCP adds user info to request.state after validation
+                if hasattr(request.state, "user_id"):
+                    set_current_user(request.state.user_id)
+                
+                response = await call_next(request)
+                return response
+        
+        app.add_middleware(UserContextMiddleware)
         
         # Run with uvicorn
-        uvicorn.run(server.app, host=host, port=port)
+        uvicorn.run(app, host=host, port=port)
         
     elif transport == "streamable-http" or transport == "sse":
         # Deprecated transports - guide to use 'http' instead

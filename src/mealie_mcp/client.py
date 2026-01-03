@@ -680,53 +680,40 @@ class MealieClient:
         return await self.upload_recipe_image(slug, image_bytes, extension)
 
 
-# Per-user client cache
-_client_cache: dict[str, MealieClient] = {}
+# Singleton client instance (single-tenant per server process)
+_client_instance: MealieClient | None = None
 
 
 def get_client() -> MealieClient:
-    """Get or create a Mealie client for the current user.
+    """Get or create the singleton Mealie client for this server instance.
     
-    Uses the user_id from request context to return a user-specific client
-    with their personal Mealie API token.
+    Each server process serves one user, with their MEALIE_TOKEN from the environment.
     
     Returns:
-        MealieClient configured with the current user's token
+        MealieClient configured with MEALIE_TOKEN from environment
     """
-    user_id = get_current_user()
+    global _client_instance
     
-    if user_id is None:
-        # Fallback to single shared client for unauthenticated access
-        logger.warning("No user context set - using default Mealie token")
-        if "default" not in _client_cache:
-            _client_cache["default"] = MealieClient()
-        return _client_cache["default"]
-    
-    # Return cached client for this user
-    if user_id in _client_cache:
-        return _client_cache[user_id]
-    
-    # Create new client for this user
-    token_store = get_token_store()
-    user_token = token_store.get_token(user_id)
-    
-    if user_token is None:
-        logger.error(
-            f"No Mealie token configured for user: {user_id}. "
-            f"Add user to config/user_tokens.json"
+    if _client_instance is None:
+        # Get configuration from environment
+        base_url = os.getenv("MEALIE_URL")
+        token = os.getenv("MEALIE_TOKEN")
+        user_id = os.getenv("MCP_USER", "unknown")
+        
+        if not token:
+            raise ValueError(
+                "MEALIE_TOKEN environment variable is required. "
+                "Set it in .env file or systemd service."
+            )
+        
+        _client_instance = MealieClient(
+            base_url=base_url,
+            token=token,
+            user_id=user_id,
         )
-        raise ValueError(f"No Mealie token configured for user: {user_id}")
+        
+        logger.info(f"Created Mealie client for user: {user_id}")
     
-    # Get base URL from environment (shared across all users)
-    base_url = os.getenv("MEALIE_URL")
-    
-    client = MealieClient(
-        base_url=base_url,
-        token=user_token,
-        user_id=user_id,
-    )
-    
-    _client_cache[user_id] = client
-    logger.info(f"Created new Mealie client for user: {user_id}")
+    return _client_instance
     
     return client

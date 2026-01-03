@@ -1,0 +1,27 @@
+# Systemd user service for Mealie MCP Server (Sam's instance)
+# 
+# Installation:
+#   1. Copy to ~/.config/systemd/user/mealie-mcp-sam.service
+#   2. Run: systemctl --user daemon-reload
+#   3. Run: systemctl --user enable --now mealie-mcp-sam
+
+[Unit]
+Description=Mealie MCP Server (Sam)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fraser/Repos/mealie-mcp-server
+Environment="PATH=/home/fraser/Repos/mealie-mcp-server/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="MCP_TRANSPORT=sse"
+Environment="MCP_HOST=0.0.0.0"
+Environment="MCP_PORT=8081"
+Environment="MCP_USER=sam"
+Environment="MCP_BASE_URL=https://rainworth-server.tailbf31d9.ts.net/sam"
+EnvironmentFile=/home/fraser/Repos/mealie-mcp-server/.env
+ExecStart=/home/fraser/Repos/mealie-mcp-server/.venv/bin/python -m mealie_mcp.server
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
