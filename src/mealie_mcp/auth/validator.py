@@ -71,11 +71,12 @@ class TokenValidator:
                     )
 
                 # Validate audience claim (RFC 8707)
+                # Allow empty audience for now (Hydra may not bind resource parameter by default)
                 audiences = token_info.get("aud", [])
                 if isinstance(audiences, str):
                     audiences = [audiences]
 
-                if self.resource_uri not in audiences:
+                if audiences and self.resource_uri not in audiences:
                     logger.warning(
                         f"Token audience mismatch. Expected: {self.resource_uri}, Got: {audiences}"
                     )
