@@ -96,14 +96,10 @@ systemctl --user enable mealie-mcp
 systemctl --user disable mealie-mcp
 ```
 
-## Implementation Notes
+## Documentation
 
-### Recipe ID Handling
-- The `create_meal_plan_entry` tool accepts both recipe slugs and UUIDs
-- Slugs are automatically resolved to UUIDs via API lookup
-- UUID format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-
-### Pydantic Model Types
-- `MealPlanEntry.id` accepts both `str` and `int` due to API inconsistency
-- Mealie API returns integer IDs for meal plan entries
-- Other models use string IDs consistently
+- **Mealie API**: https://docs.mealie.io/documentation/getting-started/api/
+- **FastMCP**: https://github.com/jlowin/fastmcp
+- **Model Context Protocol**: https://modelcontextprotocol.io/
+- **Pydantic v2**: https://docs.pydantic.dev/latest/
+- **systemd User Services**: https://wiki.archlinux.org/title/Systemd/User
