@@ -2,19 +2,23 @@
 
 ## Summary
 
-Two separate MCP server instances are now running with **Tailscale Serve authentication**:
+Two separate MCP server instances are now running with **FastMCP OAuth + Tailscale Funnel**:
 
 - **Fraser**: https://rainworth-server.tailbf31d9.ts.net/fraser/mcp
 - **Sam**: https://rainworth-server.tailbf31d9.ts.net/sam/mcp
 
-## Security Model ✅
+## Security Model ⚠️
 
-**Proper Authentication - NOT Security Through Obscurity**
+**Current: OAuth DCR + URL Obscurity + Per-Server Tokens**
 
-1. **Tailscale Serve** (not Funnel) - Requires Tailscale network membership
-2. **Per-server tokens** - Each instance uses only that user's Mealie token
-3. **Path isolation** - /fraser and /sam are separate server processes
-4. **OAuth with DCR** - FastMCP provides Dynamic Client Registration for Claude
+1. **FastMCP OAuth with DCR** - Required for Claude.ai to work (Dynamic Client Registration)
+2. **Tailscale Funnel** - Public access (required for claude.ai, works without Tailscale)
+3. **Per-server tokens** - Each instance uses only that user's Mealie token
+4. **Path isolation** - /fraser and /sam are separate server processes
+
+⚠️ **Note**: FastMCP's OAuth provides DCR but NO user authentication. Anyone with the URL can register a client.
+
+🔒 **Planned**: Auth0 integration for proper user authentication - see `.github/ISSUE_TEMPLATE/auth0-enhancement.md`
 
 ### How Tailscale Serve Works
 
