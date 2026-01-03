@@ -44,6 +44,10 @@ oauth2:
       max_ttl: 1h
   session:
     encrypt_at_rest: true
+  client_registration:
+    enabled: true
+    allowed_origins:
+      - https://claude.ai
 
 secrets:
   system:
