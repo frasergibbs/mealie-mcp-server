@@ -1,6 +1,6 @@
 version: v1.11.8
 
-dsn: postgres://hydra:secret@postgres:5432/hydra?sslmode=disable
+dsn: postgres://hydra:secret@mealie-oauth-db:5432/hydra?sslmode=disable
 
 webfinger:
   jwks:
