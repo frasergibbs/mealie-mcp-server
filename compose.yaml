@@ -92,7 +92,7 @@ services:
     image: docker.io/oryd/hydra:v2.2
     container_name: mealie-hydra
     restart: unless-stopped
-    command: serve all --dev
+    command: serve all --config /etc/config/hydra/hydra.yml
     ports:
       - "4444:4444"  # Public API
       - "4445:4445"  # Admin API (keep internal)
