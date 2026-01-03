@@ -111,6 +111,20 @@ CONSENT_TEMPLATE = """
 """
 
 
+@app.route("/", methods=["GET", "POST"])
+def root():
+    """Root handler - redirects to appropriate flow based on query parameters."""
+    # Check which flow this is based on query parameters
+    if "login_challenge" in request.args or "login_challenge" in request.form:
+        return login()
+    elif "consent_challenge" in request.args or "consent_challenge" in request.form:
+        return consent()
+    elif "error" in request.args:
+        return error()
+    else:
+        return "Mealie MCP OAuth Server - missing required parameters", 400
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     """Handle login flow."""
