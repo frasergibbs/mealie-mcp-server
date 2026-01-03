@@ -21,7 +21,8 @@ class TokenValidator:
         """
         self.auth_server_url = auth_server_url.rstrip("/")
         self.resource_uri = resource_uri.rstrip("/")
-        self.introspection_endpoint = f"{self.auth_server_url}/oauth2/introspect"
+        # Use admin API endpoint for introspection (Ory Hydra)
+        self.introspection_endpoint = f"{self.auth_server_url}/admin/oauth2/introspect"
 
     async def validate(self, token: str) -> dict[str, Any]:
         """Validate access token with authorization server.
