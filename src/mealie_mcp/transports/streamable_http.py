@@ -110,6 +110,7 @@ class StreamableHTTPServer:
                 token = self.token_validator.parse_authorization_header(authorization)
                 token_info = await self.token_validator.validate(token)
                 user_id = token_info.get("sub")
+                logger.info(f"Authenticated user: {user_id}")
             else:
                 user_id = "local"
             
