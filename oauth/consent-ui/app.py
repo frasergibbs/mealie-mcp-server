@@ -199,6 +199,8 @@ def consent():
     
     # Process consent
     action = request.form.get("action")
+    print(f"DEBUG: Consent form data: {dict(request.form)}")
+    print(f"DEBUG: action = {action!r}")
     
     if action == "allow":
         # Accept consent
