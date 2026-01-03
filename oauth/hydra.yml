@@ -51,8 +51,8 @@ secrets:
 
 serve:
   cookies:
-    same_site_mode: Lax
-    same_site_legacy_workaround: false
+    same_site_mode: None
+    same_site_legacy_workaround: true
   public:
     cors:
       enabled: true
