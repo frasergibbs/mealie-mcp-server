@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sse_starlette import EventSourceResponse
 
 from mealie_mcp.auth import TokenValidator
+from mealie_mcp.context import set_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,9 @@ class StreamableHTTPServer:
                 user_id = token_info.get("sub")
             else:
                 user_id = "local"
+            
+            # Set user context for this request
+            set_current_user(user_id)
 
             # Validate protocol version
             if mcp_protocol_version not in ["2025-06-18", "2025-03-26"]:

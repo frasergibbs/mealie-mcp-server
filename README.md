@@ -260,16 +260,30 @@ mealie-mcp-server/
 │   ├── server.py          # Main MCP server entry point
 │   ├── client.py          # Mealie API client wrapper
 │   ├── models.py          # Pydantic models
+│   ├── context.py         # Request context for user IDs
+│   ├── user_tokens.py     # Multi-user token management
+│   ├── auth/              # OAuth validation
 │   ├── portal/
 │   │   ├── __init__.py
 │   │   ├── app.py         # FastAPI rules portal
 │   │   └── rules.py       # Rules storage/retrieval
+│   ├── transports/
+│   │   ├── __init__.py
+│   │   └── streamable_http.py  # HTTP transport with OAuth
 │   └── tools/
 │       ├── __init__.py
 │       ├── recipes.py     # Recipe tools
+│       ├── recipes_write.py    # Recipe creation/editing
 │       ├── mealplans.py   # Meal planning tools
-│       ├── planning_rules.py  # Rules MCP tool
+│       ├── planning_rules.py   # Rules MCP tool
 │       └── shopping.py    # Shopping list tools
+├── config/
+│   ├── user_tokens.json   # User→token mapping (gitignored)
+│   └── README.md          # Token setup instructions
+├── docs/
+│   ├── MULTI_USER_SETUP.md     # Multi-user configuration guide
+│   ├── OAUTH_SETUP.md          # OAuth deployment guide
+│   └── DEPLOYMENT.md           # Production deployment
 ├── tests/
 ├── Containerfile
 ├── compose.yaml
@@ -277,10 +291,17 @@ mealie-mcp-server/
 └── README.md
 ```
 
+## Documentation
+
+- **[Multi-User Setup Guide](docs/MULTI_USER_SETUP.md)** - Configure for family/team use
+- **[OAuth Setup Guide](docs/OAUTH_SETUP.md)** - Deploy with Claude.ai access
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Production server setup
+
 ## Roadmap
 
 - [x] OAuth 2.1 support with Dynamic Client Registration for Claude.ai
-- [ ] Recipe creation/editing (in progress)
+- [x] Multi-user support with per-user Mealie tokens
+- [x] Recipe creation/editing
 - [ ] Nutritional analysis and filtering
 - [ ] Meal suggestions based on available ingredients
 

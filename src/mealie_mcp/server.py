@@ -544,8 +544,8 @@ def main():
         else:
             print("OAuth: disabled (DEVELOPMENT ONLY)", file=sys.stderr)
         
-        # Create ASGI app with explicit path configuration
-        # This ensures OAuth endpoints are properly mounted
+        # Create ASGI app at /mcp path
+        # When adding to Claude.ai, use full URL: https://rainworth-server.tailbf31d9.ts.net/mcp
         app = mcp.http_app(path="/mcp")
         
         # Run with uvicorn

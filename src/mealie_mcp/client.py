@@ -1,12 +1,14 @@
 """Async HTTP client wrapper for Mealie API."""
 
 import base64
+import logging
 import os
 from datetime import datetime
 from typing import Any
 
 import httpx
 
+from mealie_mcp.context import get_current_user
 from mealie_mcp.models import (
     Category,
     ErrorResponse,
@@ -22,6 +24,9 @@ from mealie_mcp.models import (
     TimelineEventCreate,
     TimelineEventType,
 )
+from mealie_mcp.user_tokens import get_token_store
+
+logger = logging.getLogger(__name__)
 
 
 class MealieClient:
@@ -32,6 +37,7 @@ class MealieClient:
         base_url: str | None = None,
         token: str | None = None,
         timeout: float = 30.0,
+        user_id: str | None = None,
     ):
         """Initialize the Mealie client.
 
@@ -39,12 +45,17 @@ class MealieClient:
             base_url: Mealie API base URL (e.g., http://mealie:9000/api)
             token: Mealie API bearer token
             timeout: Request timeout in seconds
+            user_id: OAuth user ID (for logging/debugging)
         """
         self.base_url = base_url or os.getenv("MEALIE_URL", "http://localhost:9000/api")
         self.token = token or os.getenv("MEALIE_TOKEN", "")
         self.timeout = timeout
+        self.user_id = user_id
         self._client: httpx.AsyncClient | None = None
         self._group_id: str | None = None  # Cache the user's group ID
+        
+        if user_id:
+            logger.debug(f"Created Mealie client for user: {user_id}")
 
     @property
     def headers(self) -> dict[str, str]:
@@ -669,13 +680,53 @@ class MealieClient:
         return await self.upload_recipe_image(slug, image_bytes, extension)
 
 
-# Global client instance
-_client: MealieClient | None = None
+# Per-user client cache
+_client_cache: dict[str, MealieClient] = {}
 
 
 def get_client() -> MealieClient:
-    """Get or create the global Mealie client instance."""
-    global _client
-    if _client is None:
-        _client = MealieClient()
-    return _client
+    """Get or create a Mealie client for the current user.
+    
+    Uses the user_id from request context to return a user-specific client
+    with their personal Mealie API token.
+    
+    Returns:
+        MealieClient configured with the current user's token
+    """
+    user_id = get_current_user()
+    
+    if user_id is None:
+        # Fallback to single shared client for unauthenticated access
+        logger.warning("No user context set - using default Mealie token")
+        if "default" not in _client_cache:
+            _client_cache["default"] = MealieClient()
+        return _client_cache["default"]
+    
+    # Return cached client for this user
+    if user_id in _client_cache:
+        return _client_cache[user_id]
+    
+    # Create new client for this user
+    token_store = get_token_store()
+    user_token = token_store.get_token(user_id)
+    
+    if user_token is None:
+        logger.error(
+            f"No Mealie token configured for user: {user_id}. "
+            f"Add user to config/user_tokens.json"
+        )
+        raise ValueError(f"No Mealie token configured for user: {user_id}")
+    
+    # Get base URL from environment (shared across all users)
+    base_url = os.getenv("MEALIE_URL")
+    
+    client = MealieClient(
+        base_url=base_url,
+        token=user_token,
+        user_id=user_id,
+    )
+    
+    _client_cache[user_id] = client
+    logger.info(f"Created new Mealie client for user: {user_id}")
+    
+    return client

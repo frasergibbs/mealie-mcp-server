@@ -49,6 +49,9 @@ dmypy.json
 .env.local
 .env.*.local
 
+# User tokens (contains sensitive API keys)
+config/user_tokens.json
+
 # OS
 .DS_Store
 Thumbs.db
