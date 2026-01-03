@@ -121,7 +121,7 @@ class Recipe(RecipeSummary):
 class MealPlanEntry(MealieBase):
     """A single meal plan entry."""
 
-    id: str
+    id: str | int  # API returns int, but accept both for flexibility
     date: date
     entry_type: MealType = Field(alias="entryType")
     recipe_id: str | None = Field(None, alias="recipeId")
