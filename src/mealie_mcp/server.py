@@ -6,8 +6,6 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from fastmcp.server.auth.auth import ClientRegistrationOptions
-from fastmcp.server.auth.providers.in_memory import InMemoryOAuthProvider
 
 from mealie_mcp.tools.mealplans import (
     create_meal_plan_entry,
@@ -41,28 +39,13 @@ from mealie_mcp.tools.shopping import (
 # Load environment variables
 load_dotenv()
 
-# Set up OAuth provider if authentication is required
-auth_provider = None
-if os.getenv("MCP_REQUIRE_AUTH", "false").lower() == "true":
-    base_url = os.getenv("MCP_BASE_URL")
-    if not base_url:
-        print("Error: MCP_BASE_URL required when MCP_REQUIRE_AUTH=true", file=sys.stderr)
-        print("Example: MCP_BASE_URL=https://rainworth-server.tailbf31d9.ts.net", file=sys.stderr)
-        sys.exit(1)
-    
-    auth_provider = InMemoryOAuthProvider(
-        base_url=base_url,
-        client_registration_options=ClientRegistrationOptions(
-            enabled=True,  # Enable Dynamic Client Registration for Claude
-            valid_scopes=["mcp"],  # Define available scopes
-        ),
-    )
-    print(f"OAuth enabled with Dynamic Client Registration at {base_url}", file=sys.stderr)
+# OAuth is handled by StreamableHTTPServer with Ory Hydra (not FastMCP's built-in auth)
+# This allows multi-user support with per-user Mealie tokens
 
-# Create the MCP server
+# Create the MCP server (no auth provider - handled by custom transport)
 mcp = FastMCP(
     name="mealie",
-    auth=auth_provider,  # Pass auth provider to FastMCP
+    auth=None,  # OAuth handled by StreamableHTTPServer transport
     instructions="""You are connected to a personal Mealie recipe library.
 You can search recipes, view details, create/edit recipes, manage meal plans, and work with shopping lists.
 
@@ -532,24 +515,26 @@ def main():
     transport = os.getenv("MCP_TRANSPORT", "stdio")
 
     if transport == "http":
-        # Modern HTTP transport with FastMCP's built-in OAuth 2.1
+        # HTTP transport with Ory Hydra OAuth 2.1 (for multi-user support)
         import uvicorn
+        from mealie_mcp.transports.streamable_http import StreamableHTTPServer
         
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "8080"))
         
-        print(f"Starting HTTP server on {host}:{port}", file=sys.stderr)
-        if mcp.auth:
-            print("OAuth: enabled with Dynamic Client Registration (DCR)", file=sys.stderr)
-        else:
-            print("OAuth: disabled (DEVELOPMENT ONLY)", file=sys.stderr)
+        print(f"Starting HTTP server with Ory Hydra OAuth on {host}:{port}", file=sys.stderr)
+        print("OAuth: Ory Hydra with multi-user token support", file=sys.stderr)
         
-        # Create ASGI app at /mcp path
-        # When adding to Claude.ai, use full URL: https://rainworth-server.tailbf31d9.ts.net/mcp
-        app = mcp.http_app(path="/mcp")
+        # Create custom transport with Ory Hydra integration
+        server = StreamableHTTPServer(
+            mcp_instance=mcp,
+            require_auth=True,
+            auth_server_url=os.getenv("OAUTH_SERVER_URL"),
+            resource_uri=os.getenv("MCP_RESOURCE_URI"),
+        )
         
         # Run with uvicorn
-        uvicorn.run(app, host=host, port=port)
+        uvicorn.run(server.app, host=host, port=port)
         
     elif transport == "streamable-http" or transport == "sse":
         # Deprecated transports - guide to use 'http' instead
