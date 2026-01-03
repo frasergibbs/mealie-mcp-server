@@ -93,15 +93,18 @@ CONSENT_TEMPLATE = """
     
     <form method="post" style="margin-top: 30px;" id="consentForm">
         <input type="hidden" name="consent_challenge" value="{{ consent_challenge }}">
-        <button type="submit" name="action" value="allow" class="allow" id="allowBtn">Allow Access</button>
-        <button type="submit" name="action" value="deny" class="deny" id="denyBtn">Deny</button>
+        <input type="hidden" name="action" id="actionInput" value="">
+        <button type="button" class="allow" id="allowBtn" onclick="submitConsent('allow')">Allow Access</button>
+        <button type="button" class="deny" id="denyBtn" onclick="submitConsent('deny')">Deny</button>
     </form>
     
     <script>
-        document.getElementById('consentForm').addEventListener('submit', function() {
+        function submitConsent(action) {
+            document.getElementById('actionInput').value = action;
             document.getElementById('allowBtn').disabled = true;
             document.getElementById('denyBtn').disabled = true;
-        });
+            document.getElementById('consentForm').submit();
+        }
     </script>
 </body>
 </html>
