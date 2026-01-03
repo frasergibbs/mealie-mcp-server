@@ -533,6 +533,8 @@ def main():
 
     if transport == "http":
         # Modern HTTP transport with FastMCP's built-in OAuth 2.1
+        import uvicorn
+        
         host = os.getenv("MCP_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_PORT", "8080"))
         
@@ -542,7 +544,12 @@ def main():
         else:
             print("OAuth: disabled (DEVELOPMENT ONLY)", file=sys.stderr)
         
-        mcp.run(transport="http", host=host, port=port)
+        # Create ASGI app with explicit path configuration
+        # This ensures OAuth endpoints are properly mounted
+        app = mcp.http_app(path="/mcp")
+        
+        # Run with uvicorn
+        uvicorn.run(app, host=host, port=port)
         
     elif transport == "streamable-http" or transport == "sse":
         # Deprecated transports - guide to use 'http' instead
