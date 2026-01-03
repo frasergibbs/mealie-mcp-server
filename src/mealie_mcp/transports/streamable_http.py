@@ -94,7 +94,7 @@ class StreamableHTTPServer:
                 "resource_documentation": "https://github.com/frasergibbs/mealie-mcp-server",
             }
 
-        @self.app.post("/")
+        @self.app.post("/mcp")
         async def mcp_endpoint(
             request: Request,
             authorization: str | None = Header(None),
@@ -164,7 +164,7 @@ class StreamableHTTPServer:
                 logger.debug(f"Received notification/response: {message.get('method', 'response')}")
                 return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={})
 
-        @self.app.get("/")
+        @self.app.get("/mcp")
         async def mcp_listen(
             request: Request,
             authorization: str | None = Header(None),
