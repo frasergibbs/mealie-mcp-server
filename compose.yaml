@@ -81,6 +81,7 @@ services:
     command: migrate sql -e --yes
     environment:
       - DSN=postgres://hydra:secret@postgres:5432/hydra?sslmode=disable
+      - SECRETS_SYSTEM=CHANGEME_GENERATE_SECURE_32CHAR_SECRET
     networks:
       - oauth_network
     depends_on:
@@ -98,6 +99,7 @@ services:
       - "4445:4445"  # Admin API (keep internal)
     environment:
       - DSN=postgres://hydra:secret@postgres:5432/hydra?sslmode=disable
+      - SECRETS_SYSTEM=CHANGEME_GENERATE_SECURE_32CHAR_SECRET
     volumes:
       - ./oauth/hydra.yml:/etc/config/hydra/hydra.yml:ro
     networks:
